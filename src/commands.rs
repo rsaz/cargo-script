@@ -1,8 +1,12 @@
+//! This module defines the commands and their execution logic for the cargo-script CLI tool.
+//!
+//! It includes functionalities to run scripts, initialize the Scripts.toml file, and handle script execution.
 use std::{collections::HashMap, fs, io, process::Command};
 use clap::{Subcommand, ArgAction};
 use serde::Deserialize;
 use emoji::symbols;
 
+/// Enum representing the different commands supported by the CLI tool.
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command(about = "Run a script by name defined in Scripts.toml")]
@@ -14,6 +18,7 @@ pub enum Commands {
     Init,
 }
 
+/// Enum representing a script, which can be either a default command or a detailed script with additional metadata.
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Script {
@@ -26,11 +31,18 @@ pub enum Script {
     }
 }
 
+/// Struct representing the collection of scripts defined in Scripts.toml.
 #[derive(Deserialize)]
 pub struct Scripts {
     pub scripts: HashMap<String, Script>
 }
 
+/// Run a script by name, executing any included scripts in sequence.
+/// 
+/// # Arguments
+///
+/// * `scripts` - A reference to the collection of scripts.
+/// * `script_name` - The name of the script to run.
 pub fn run_script(scripts: &Scripts, script_name: &str) {
     if let Some(script) = scripts.scripts.get(script_name) {
         match script {
@@ -60,6 +72,12 @@ pub fn run_script(scripts: &Scripts, script_name: &str) {
     }
 }
 
+/// Execute a command using the specified interpreter, or the default shell if none is specified.
+/// 
+/// # Arguments
+///
+/// * `interpreter` - An optional string representing the interpreter to use.
+/// * `command` - The command to execute.
 fn execute_command(interpreter: Option<&str>, command: &str) {
     match interpreter {
         Some("bash") => {
@@ -112,6 +130,8 @@ fn execute_command(interpreter: Option<&str>, command: &str) {
     }
 }
 
+/// Initialize a Scripts.toml file in the current directory.
+/// If the file already exists, prompt the user for confirmation to replace it.
 pub fn init_script_file() {
     let file_path = "Scripts.toml";
     if fs::metadata(file_path).is_ok() {
@@ -124,12 +144,12 @@ pub fn init_script_file() {
         }
     }
     let default_content = r#"
-[scripts]
-i_am_shell = "./.scripts/i_am_shell.sh"
-i_am_shell_obj = { interpreter = "bash", command = "./.scripts/i_am_shell.sh", info = "Detect shell script" }
-build = "echo 'build'"
-release = { include = ["i_am_shell", "build"] }
-"#;
+        dev = "cargo run"
+        build = "cargo build" 
+        release = "cargo build --release
+        test = "cargo test"
+        doc = "cargo doc --no-deps --open"
+    "#;
     fs::write(file_path, default_content).expect("Failed to write Scripts.toml");
     println!("{} Scripts.toml has been created.", symbols::other_symbol::CHECK_MARK.glyph);
 }
