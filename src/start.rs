@@ -1,7 +1,7 @@
 //! This module contains the main logic for the cargo-script CLI tool.
 //!
 //! It parses the command-line arguments and executes the appropriate commands.
-use crate::commands::{Commands, Scripts, run_script, init_script_file};
+use crate::commands::{init_script_file, run_script, Commands, Scripts};
 use std::fs;
 use clap::Parser;
 use colored::*;
@@ -12,6 +12,9 @@ use colored::*;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    /// Optional path to the Scripts.toml file.
+    #[arg(long, default_value = "Scripts.toml", global = true)]
+    scripts_path: String,
 }
 
 /// Main function that parses command-line arguments and executes the specified command.
@@ -21,9 +24,11 @@ pub fn run() {
 
     let cli = Cli::parse();
     
+    let scripts_path = &cli.scripts_path;
+
     match &cli.command {
         Commands::Run { script } => {
-            let scripts: Scripts = toml::from_str(&fs::read_to_string("Scripts.toml").expect("Fail to load Scripts.toml"))
+            let scripts: Scripts = toml::from_str(&fs::read_to_string(scripts_path).expect("Fail to load Scripts.toml"))
                 .expect("Fail to parse Scripts.toml");
             run_script(&scripts, script);
         }

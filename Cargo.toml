@@ -19,6 +19,10 @@ toml = "0.8.14"
 colored = "2.1.0"
 emoji = "0.2.1"
 
+[dev-dependencies]
+assert_cmd = "2.0.14"
+predicates = "3.1.0"
+
 [[bin]]
 name = "cargo-script"
 path = "src/main.rs"

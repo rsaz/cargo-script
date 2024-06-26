@@ -3,3 +3,4 @@ i_am_shell = "./.scripts/test_script.sh"
 i_am_shell_obj = { interpreter = "bash", command = "./.scripts/test_script.sh", info = "Detect shell script" }
 build = "echo 'build'"
 release = { include = ["i_am_shell", "build"] }
+release_info = { include = ["i_am_shell_obj", "build"], info = "Release info" }
