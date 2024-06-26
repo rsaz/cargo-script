@@ -1,15 +1,15 @@
-# cargo-script
+# cargo-run
 
 <!-- prettier-ignore-start -->
 
-[![crates.io](https://img.shields.io/crates/v/cargo-script?label=latest)](https://crates.io/crates/cargo-script)
-[![Documentation](https://docs.rs/cargo-script/badge.svg)](https://docs.rs/cargo-script)
-[![Documentation](https://docs.rs/cargo-script/badge.svg?version=0.1.0)](https://docs.rs/cargo-script/0.1.0)
+[![crates.io](https://img.shields.io/crates/v/cargo-run?label=latest)](https://crates.io/crates/cargo-run)
+[![Documentation](https://docs.rs/cargo-run/badge.svg)](https://docs.rs/cargo-run)
+[![Documentation](https://docs.rs/cargo-run/badge.svg?version=0.1.0)](https://docs.rs/cargo-run/0.1.0)
 ![Version](https://img.shields.io/badge/rustc-1.79+-ab6000.svg)
-![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/cargo-script.svg)
+![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/cargo-run.svg)
 <br />
-[![Dependency Status](https://deps.rs/crate/cargo-script/0.1.0/status.svg)](https://deps.rs/crate/cargo-script/0.1.0)
-[![Download](https://img.shields.io/crates/d/cargo-script.svg)](https://crates.io/crates/cargo-script)
+[![Dependency Status](https://deps.rs/crate/cargo-run/0.1.0/status.svg)](https://deps.rs/crate/cargo-run/0.1.0)
+[![Download](https://img.shields.io/crates/d/cargo-run.svg)](https://crates.io/crates/cargo-run)
 
 <!-- prettier-ignore-end -->
 
@@ -26,10 +26,10 @@ A CLI tool to run custom scripts in Rust, defined in `Scripts.toml`.
 
 ## Installation
 
-To install `cargo-script`, use the following command:
+To install `cargo-run`, use the following command:
 
 ```sh
-cargo install cargo-script
+cargo install cargo-run
 ```
 
 ## Usage
