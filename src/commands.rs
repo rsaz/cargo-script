@@ -11,7 +11,7 @@ use emoji::symbols;
 pub enum Commands {
     #[command(about = "Run a script by name defined in Scripts.toml")]
     Run {
-        #[arg(short, long, value_name = "SCRIPT_NAME", action = ArgAction::Set)]
+        #[arg(value_name = "SCRIPT_NAME", action = ArgAction::Set)]
         script: String,
     },
     #[command(about = "Initialize a Scripts.toml file in the current directory")]
