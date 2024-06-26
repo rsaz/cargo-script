@@ -32,7 +32,22 @@ path = "src/main.rs"
 name = "cgs"
 path = "src/cgs.rs"
 
+include = [
+    "Cargo.toml",
+    "README.md",
+    "src/**",
+]
 
+exclude = [
+    "/.scripts/",
+    "/tests/",
+    "/target/",
+    "*.lock",
+    "*.orig",
+    ".gitignore",
+    ".cargo_vcs_info.json",
+    "Scripts.toml",
+]
 
 
 
