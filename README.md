@@ -37,19 +37,39 @@ cargo install cargo-script
 To run a script, use the following command:
 
 ```sh
-
+cargo-script <option> <script_name>
 ```
 
-## Scripts Configuration
+Or
+
+```sh
+cgs <option> <script_name>
+```
+
+Complete script:
+
+```sh
+cgs run <script_name>
+
+// Or
+
+cargo-script run <script_name>
+```
+
+## Scripts Examples
 
 The `Scripts.toml` file is used to define scripts. The file is located in the root of the project directory. The following is an example of a `Scripts.toml` file:
 
 ```toml
 [scripts]
-i_am_shell = "./.scripts/i_am_shell.sh" // run a shell script
-i_am_shell_obj = { interpreter = "bash", command = "./.scripts/i_am_shell.sh", info = "Detect shell script" } // run a shell script with interpreter, also add script info
-build = "echo 'build'" // run a simple command
-release = { include = ["i_am_shell", "build"] } // run a chain of scripts
+# run a shell script
+run_shell = "./.scripts/i_am_shell.sh"
+# run a shell script with interpreter, also add script info
+config = { interpreter = "bash", command = "echo 'test'", info = "Script to test" }
+# run inline script
+build = "echo 'build'"
+# run chain of scripts
+release = { include = ["i_am_shell", "build"] }
 ```
 
 <!-- cargo-rdme end -->
