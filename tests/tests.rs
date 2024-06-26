@@ -2,7 +2,8 @@ use assert_cmd::Command;
 use std::fs;
 use std::process::Command as ProcessCommand;
 
-// Ensure the test scripts directory exists and is executable
+/// Sets up the test scripts by creating a directory and a test script file,
+/// and making the script executable.
 fn setup_test_scripts() {
     let script_content = r#"
 #!/usr/bin/env bash
@@ -16,6 +17,8 @@ echo "Test script executed"
         .expect("Failed to make test script executable");
 }
 
+/// Tests the `i_am_shell` script defined in `Scripts.toml`.
+/// This script should output "Test script executed".
 #[test]
 fn test_i_am_shell() {
     setup_test_scripts();
@@ -27,6 +30,9 @@ fn test_i_am_shell() {
         .stdout(predicates::str::contains("Test script executed"));
 }
 
+/// Tests the `i_am_shell_obj` script defined in `Scripts.toml`.
+/// This script uses the bash interpreter and includes an info message.
+/// The output should contain both the info message and "Test script executed".
 #[test]
 fn test_i_am_shell_obj() {
     setup_test_scripts();
@@ -39,6 +45,8 @@ fn test_i_am_shell_obj() {
         .stdout(predicates::str::contains("Test script executed"));
 }
 
+/// Tests the `build` script defined in `Scripts.toml`.
+/// This script should output "build".
 #[test]
 fn test_build() {
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
@@ -48,6 +56,9 @@ fn test_build() {
         .stdout(predicates::str::contains("build"));
 }
 
+/// Tests the `release` script defined in `Scripts.toml`.
+/// This script includes the `i_am_shell` and `build` scripts.
+/// The output should contain both "Test script executed" and "build".
 #[test]
 fn test_release() {
     setup_test_scripts();
@@ -60,6 +71,9 @@ fn test_release() {
         .stdout(predicates::str::contains("build"));
 }
 
+/// Tests the `release_info` script defined in `Scripts.toml`.
+/// This script includes an info message, the `i_am_shell_obj`, and `build` scripts.
+/// The output should contain the info message, "Test script executed", and "build".
 #[test]
 fn test_release_info() {
     setup_test_scripts();
