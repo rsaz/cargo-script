@@ -1,0 +1,6 @@
+[scripts]
+build = "echo 'build'"
+build_prod = "echo 'build:prod'"
+config_env = "./.scripts/script1.sh"
+test_unit = "echo 'test:unit'"
+release = "config_env && test_unit"

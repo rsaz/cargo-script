@@ -1,0 +1,24 @@
+[package]
+name = "cargo-script"
+description = "A CLI tool to run custom scripts in Rust, defined in Scripts.toml"
+version = "0.1.0"
+edition = "2021"
+authors = ["Richard Zampieri<br.developer@gmail.com>"]
+categories = ["command-line-utilities", "development-tools"]
+keywords = ["command-line", "task", "runner", "development", "utility"]
+license = "MIT/Apache-2.0"
+readme = "crates-io-readme.md"
+repository = "https://github.com/rsaz/cargo-script"
+rust-version = "1.79"
+
+
+[dependencies]
+clap = { version = "4.5.7", features = ["derive"]}
+serde = { version = "1.0.203", features = ["derive"]}
+toml = "0.8.14"
+colored = "2.1.0"
+emoji = "0.2.1"
+
+[[bin]]
+name = "cargo-script"
+path = "src/main.rs"
