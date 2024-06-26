@@ -12,6 +12,22 @@ repository = "https://github.com/rsaz/cargo-script"
 homepage = "https://github.com/rsaz/cargo-script"
 rust-version = "1.79"
 
+include = [
+    "Cargo.toml",
+    "README.md",
+    "src/**",
+]
+
+exclude = [
+    "/.scripts/",
+    "/tests/",
+    "/target/",
+    "*.lock",
+    "*.orig",
+    ".gitignore",
+    ".cargo_vcs_info.json",
+    "Scripts.toml",
+]
 
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"]}
@@ -32,22 +48,6 @@ path = "src/main.rs"
 name = "cgs"
 path = "src/cgs.rs"
 
-include = [
-    "Cargo.toml",
-    "README.md",
-    "src/**",
-]
-
-exclude = [
-    "/.scripts/",
-    "/tests/",
-    "/target/",
-    "*.lock",
-    "*.orig",
-    ".gitignore",
-    ".cargo_vcs_info.json",
-    "Scripts.toml",
-]
 
 
 
