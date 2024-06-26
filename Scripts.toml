@@ -1,6 +1,5 @@
 [scripts]
+i_am_shell = "./.scripts/i_am_shell.sh"
+i_am_shell_obj = { interpreter = "bash", command = "./.scripts/i_am_shell.sh", info = "Detect shell script" }
 build = "echo 'build'"
-build_prod = "echo 'build:prod'"
-config_env = "./.scripts/script1.sh"
-test_unit = "echo 'test:unit'"
-release = "config_env && test_unit"
+release = { include = ["i_am_shell", "build"] }

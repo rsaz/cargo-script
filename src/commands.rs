@@ -14,47 +14,101 @@ pub enum Commands {
     Init,
 }
 
-
-#[derive(Deserialize)]
-pub struct Scripts {
-    pub scripts: HashMap<String, String>
-}
-
-pub fn run_script(script: &str) {
-    match detect_os() {
-        "windows_cmd" => {
-            Command::new("cmd")
-                .args(&["/C", script])
-                .status()
-                .expect("Failed to execute script using [CMD]");
-        },
-        "windows_powershell" => {
-            Command::new("powershell")
-                .args(&["-Command", script])
-                .status()
-                .expect("Failed to execute script using [Powershell]");
-        },
-        "macos" | "linux" => {
-            Command::new("sh")
-                .args(&["-c", script])
-                .status()
-                .expect("Failed to execute script using [sh]");
-        }
-        _ => {
-            println!("Unsupported OS");
-        }
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum Script {
+    Default(String),
+    Detailed {
+        interpreter: Option<String>,
+        command: Option<String>,
+        info: Option<String>,
+        include: Option<Vec<String>>,
     }
 }
 
-fn detect_os() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "windows_cmd"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else if cfg!(target_os = "linux") {
-        "linux"
+#[derive(Deserialize)]
+pub struct Scripts {
+    pub scripts: HashMap<String, Script>
+}
+
+pub fn run_script(scripts: &Scripts, script_name: &str) {
+    if let Some(script) = scripts.scripts.get(script_name) {
+        match script {
+            Script::Default(cmd) => {
+                let msg: String = format!("{} {}: {}", symbols::other_symbol::CHECK_MARK.glyph, "Running script", script_name);
+                println!("{}\n", msg);
+                execute_command(None, cmd);
+            },
+            Script::Detailed { interpreter, command, info, include } => {
+                if let Some(include_scripts) = include {
+                    for include_script in include_scripts {
+                        run_script(scripts, include_script);
+                    }
+                }
+                if let Some(info_msg) = info {
+                    println!("{}", info_msg);
+                }
+                if let Some(cmd) = command {
+                    let msg: String = format!("{} {}: {}", symbols::other_symbol::CHECK_MARK.glyph, "Running script", script_name);
+                    println!("{}\n", msg);
+                    execute_command(interpreter.as_deref(), cmd);
+                }
+            }
+        }
     } else {
-        "unknown"
+        println!("{} Script not found: {}", symbols::other_symbol::CROSS_MARK.glyph, script_name);
+    }
+}
+
+fn execute_command(interpreter: Option<&str>, command: &str) {
+    match interpreter {
+        Some("bash") => {
+            Command::new("bash")
+                .arg("-c")
+                .arg(command)
+                .status()
+                .expect("Failed to execute script using bash");
+        }
+        Some("zsh") => {
+            Command::new("zsh")
+                .arg("-c")
+                .arg(command)
+                .status()
+                .expect("Failed to execute script using zsh");
+        }
+        Some("powershell") => {
+            Command::new("powershell")
+                .args(&["-Command", command])
+                .status()
+                .expect("Failed to execute script using PowerShell");
+        }
+        Some("cmd") => {
+            Command::new("cmd")
+                .args(&["/C", command])
+                .status()
+                .expect("Failed to execute script using cmd");
+        }
+        Some(other) => {
+            Command::new(other)
+                .arg("-c")
+                .arg(command)
+                .status()
+                .expect(&format!("Failed to execute script using {}", other));
+        }
+        None => {
+            if cfg!(target_os = "windows") {
+                Command::new("cmd")
+                    .args(&["/C", command])
+                    .status()
+                    .expect("Failed to execute script using cmd");
+            } else {
+                Command::new("sh")
+                    .arg("-c")
+                    .arg(command)
+                    .status()
+                    .expect("Failed to execute script using sh");
+            }
+        }
     }
 }
 
@@ -71,8 +125,10 @@ pub fn init_script_file() {
     }
     let default_content = r#"
 [scripts]
-script1 = "echo Running script 1"
-script2 = "echo Running script 2"
+i_am_shell = "./.scripts/i_am_shell.sh"
+i_am_shell_obj = { interpreter = "bash", command = "./.scripts/i_am_shell.sh", info = "Detect shell script" }
+build = "echo 'build'"
+release = { include = ["i_am_shell", "build"] }
 "#;
     fs::write(file_path, default_content).expect("Failed to write Scripts.toml");
     println!("{} Scripts.toml has been created.", symbols::other_symbol::CHECK_MARK.glyph);
