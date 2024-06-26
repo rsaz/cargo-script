@@ -19,10 +19,10 @@ pub fn run() {
     let cli = Cli::parse();
     
     match &cli.command {
-        Commands::Script { run } => {
+        Commands::Run { script } => {
             let scripts: Scripts = toml::from_str(&fs::read_to_string("Scripts.toml").expect("Fail to load Scripts.toml"))
                 .expect("Fail to parse Scripts.toml");
-            run_script(&scripts, run);
+            run_script(&scripts, script);
         }
         Commands::Init => {
             init_script_file();

@@ -22,3 +22,14 @@ emoji = "0.2.1"
 [[bin]]
 name = "cargo-script"
 path = "src/main.rs"
+
+[[bin]]
+name = "cgs"
+path = "src/cgs.rs"
+
+
+
+
+
+
+

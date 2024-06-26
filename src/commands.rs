@@ -10,9 +10,9 @@ use emoji::symbols;
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command(about = "Run a script by name defined in Scripts.toml")]
-    Script {
+    Run {
         #[arg(short, long, value_name = "SCRIPT_NAME", action = ArgAction::Set)]
-        run: String,
+        script: String,
     },
     #[command(about = "Initialize a Scripts.toml file in the current directory")]
     Init,
