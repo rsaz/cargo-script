@@ -144,12 +144,13 @@ pub fn init_script_file() {
         }
     }
     let default_content = r#"
-        dev = "cargo run"
-        build = "cargo build" 
-        release = "cargo build --release
-        test = "cargo test"
-        doc = "cargo doc --no-deps --open"
-    "#;
+[scripts]
+dev = "cargo run"
+build = "cargo build"
+release = "cargo build --release"
+test = "cargo test"
+doc = "cargo doc --no-deps --open"
+"#;
     fs::write(file_path, default_content).expect("Failed to write Scripts.toml");
     println!("{} Scripts.toml has been created.", symbols::other_symbol::CHECK_MARK.glyph);
 }
