@@ -27,10 +27,10 @@ pub fn run() {
     let scripts_path = &cli.scripts_path;
 
     match &cli.command {
-        Commands::Run { script } => {
+        Commands::Run { script, env } => {
             let scripts: Scripts = toml::from_str(&fs::read_to_string(scripts_path).expect("Fail to load Scripts.toml"))
                 .expect("Fail to parse Scripts.toml");
-            run_script(&scripts, script);
+            run_script(&scripts, script, env.clone());
         }
         Commands::Init => {
             init_script_file();
