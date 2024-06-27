@@ -202,5 +202,5 @@ test = { command = "cargo test", env = { RUST_LOG = "warn" } }
 doc = "cargo doc --no-deps --open"
 "#;
     fs::write(file_path, default_content).expect("Failed to write Scripts.toml");
-    println!("{} Scripts.toml has been created.", symbols::other_symbol::CHECK_MARK.glyph);
+    println!("{}  [ {} ] has been created.", symbols::other_symbol::CHECK_MARK.glyph, "Scripts.toml".green());
 }
