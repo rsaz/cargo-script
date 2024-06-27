@@ -48,46 +48,57 @@ pub struct Scripts {
 ///
 /// * `scripts` - A reference to the collection of scripts.
 /// * `script_name` - The name of the script to run.
+/// * `env_overrides` - A vector of command line environment variable overrides.
 pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>) {
-    let mut env_vars = scripts.global_env.clone().unwrap_or_default();
+    fn run_script_with_level(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>, level: usize) {
+        let mut env_vars = scripts.global_env.clone().unwrap_or_default();
+        let indent = "  ".repeat(level);
 
-    if let Some(script) = scripts.scripts.get(script_name) {
-        match script {
-            Script::Default(cmd) => {
-                let msg: String = format!("{}  {}: [ {} ]", symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name);
-                println!("{}\n", msg);
-                apply_env_vars(&env_vars, &env_overrides);
-                execute_command(None, cmd);
-            },
-            Script::Detailed { interpreter, command, info, env, include } => {
-                let description = format!("{}  {}: {}", emoji::objects::book_paper::BOOKMARK_TABS.glyph, "Description".green(), if let Some(info_msg) = info { info_msg } else { "No description provided" });
-
-                if let Some(include_scripts) = include {
-                    // Print the description once before running the included scripts
-                    println!("{}  {}\n", format!("{}  {}: [ {} ]", symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name), description);
-                    for include_script in include_scripts {
-                        run_script(scripts, include_script, env_overrides.clone());
-                    }
-                } else {
-                    // Print the description and command details if no included scripts
-                    println!("{}  {}\n", format!("{}  {}: [ {} ]", symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name), description);
-                }
-                
-                if let Some(cmd) = command {
-                    if let Some(script_env) = env {
-                        env_vars.extend(script_env.clone());
-                    }
+        if let Some(script) = scripts.scripts.get(script_name) {
+            match script {
+                Script::Default(cmd) => {
+                    let msg = format!("{}{}  {}: [ {} ]", indent, symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name);
+                    println!("{}\n", msg);
                     apply_env_vars(&env_vars, &env_overrides);
-                    execute_command(interpreter.as_deref(), cmd);
+                    execute_command(None, cmd);
+                },
+                Script::Detailed { interpreter, command, info, env, include } => {
+                    let description = format!(
+                        "{}  {}: {}",
+                        emoji::objects::book_paper::BOOKMARK_TABS.glyph,
+                        "Description".green(),
+                        info.as_deref().unwrap_or("No description provided")
+                    );
+
+                    if let Some(include_scripts) = include {
+                        let msg = format!("{}{}  {}: [ {} ]  {}", indent, symbols::other_symbol::CHECK_MARK.glyph,"Running include script".green(), script_name, description);
+                        println!("{}\n", msg);
+                        for include_script in include_scripts {
+                            run_script_with_level(scripts, include_script, env_overrides.clone(), level + 1);
+                        }
+                    } else {
+                        // Print the script message
+                        let msg = format!("{}{}  {}: [ {} ]  {}", indent, symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name, description);
+                        println!("{}\n", msg);
+                    }
+
+                    if let Some(cmd) = command {
+                        if let Some(script_env) = env {
+                            env_vars.extend(script_env.clone());
+                        }
+                        apply_env_vars(&env_vars, &env_overrides);
+                        execute_command(interpreter.as_deref(), cmd);
+                    }
                 }
             }
+            println!("\n");
+        } else {
+            println!("{} Script not found: {}", indent, script_name);
         }
-        println!("\n");
-    } else {
-        println!("{} Script not found: {}", symbols::other_symbol::CROSS_MARK.glyph, script_name);
     }
-}
 
+    run_script_with_level(scripts, script_name, env_overrides, 0);
+}
 
 /// Apply environment variables from global, script-specific, and command line overrides.
 /// 

@@ -7,7 +7,7 @@ i_am_shell = "./.scripts/test_script.sh"
 i_am_shell_obj = { interpreter = "bash", command = "./.scripts/test_script.sh", info = "Detect shell script" }
 build = "echo 'build'"
 test_info = { command = "echo 't-info'", info = "Test info" }
-release = { include = ["i_am_shell", "build"] }
+release = { include = ["i_am_shell", "i_am_shell_obj", "build"] }
 release_info = { include = ["i_am_shell_obj", "build"], info = "Release info" }
 test01_env = { command = "echo $EXAMPLE_VAR", env = { EXAMPLE_VAR = "change_value" } }
 test02_env = { command = "echo ${RUST_LOG:-unset} ${COMMON_VAR:-unset}", env = { RUST_LOG = "warn" } }
