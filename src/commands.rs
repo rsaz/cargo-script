@@ -15,7 +15,7 @@ pub enum Commands {
         #[arg(value_name = "SCRIPT_NAME", action = ArgAction::Set)]
         script: String,
         #[arg(short, long, value_name = "KEY=VALUE", action = ArgAction::Append)]
-        env_overrides: Vec<String>,
+        env: Vec<String>,
     },
     #[command(about = "Initialize a Scripts.toml file in the current directory")]
     Init,
@@ -93,7 +93,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
             }
             println!("\n");
         } else {
-            println!("{} Script not found: {}", indent, script_name);
+            println!("{}{} {}: [ {} ]", indent,symbols::other_symbol::CROSS_MARK.glyph, "Script not found".red(), script_name);
         }
     }
 
@@ -193,7 +193,6 @@ pub fn init_script_file() {
     }
     let default_content = r#"
 [global_env]
-COMMON_VAR = "common_value"
 
 [scripts]
 dev = "cargo run"
