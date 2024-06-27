@@ -17,6 +17,12 @@ echo "Test script executed"
         .expect("Failed to make test script executable");
 }
 
+/// Sets up the Scripts.toml file with the specified content.
+#[allow(dead_code)]
+fn setup_scripts_toml(content: &str) {
+    fs::write("Scripts.toml", content).unwrap();
+}
+
 /// Tests the `i_am_shell` script defined in `Scripts.toml`.
 /// This script should output "Test script executed".
 #[test]
@@ -86,3 +92,4 @@ fn test_release_info() {
         .stdout(predicates::str::contains("Test script executed"))
         .stdout(predicates::str::contains("build"));
 }
+
