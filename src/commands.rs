@@ -183,7 +183,7 @@ fn execute_command(interpreter: Option<&str>, command: &str) {
 pub fn init_script_file() {
     let file_path = "Scripts.toml";
     if fs::metadata(file_path).is_ok() {
-        println!("{}  {} already exists. Do you want to replace it? (y/n)", symbols::warning::WARNING.glyph, file_path);
+        println!("{}  [ {} ] already exists. Do you want to replace it? ({}/{})", symbols::warning::WARNING.glyph, file_path.yellow(), "y".green(), "n".red());
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Failed to read input");
         if input.trim().to_lowercase() != "y" {
