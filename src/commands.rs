@@ -1,7 +1,7 @@
 //! This module defines the commands and their execution logic for the cargo-script CLI tool.
 //!
 //! It includes functionalities to run scripts, initialize the Scripts.toml file, and handle script execution.
-use std::{collections::HashMap, env, fs, io, process::Command};
+use std::{collections::HashMap, env, fs, io, process::Command, sync::{Arc, Mutex}, time::{Duration, Instant}};
 use clap::{Subcommand, ArgAction};
 use serde::Deserialize;
 use emoji::symbols;
@@ -19,6 +19,8 @@ pub enum Commands {
     },
     #[command(about = "Initialize a Scripts.toml file in the current directory")]
     Init,
+    #[command(about = "Show all script names and descriptions defined in Scripts.toml")]
+    Show,
 }
 
 /// Enum representing a script, which can be either a default command or a detailed script with additional metadata.
@@ -42,6 +44,36 @@ pub struct Scripts {
     pub scripts: HashMap<String, Script>
 }
 
+/// Show all script names and descriptions in a table format.
+/// 
+/// # Arguments
+///
+/// * `scripts` - A reference to the collection of scripts.
+pub fn show_scripts(scripts: &Scripts) {   
+    let mut max_script_name_len = "Script".len();
+    let mut max_description_len = "Description".len();
+
+    for (name, script) in &scripts.scripts {
+        max_script_name_len = max_script_name_len.max(name.len() + 2);
+        let description = match script {
+            Script::Default(_) => "",
+            Script::Detailed { info, .. } => info.as_deref().unwrap_or(""),
+        };
+        max_description_len = max_description_len.max(description.len() + 2);
+    }
+   
+    println!("{:<width1$} {:<width2$}", "Script".yellow(), "Description".yellow(), width1 = max_script_name_len, width2 = max_description_len);
+    println!("{:<width1$} {:<width2$}", "-".repeat(max_script_name_len).yellow(), "-".repeat(max_description_len).yellow(), width1 = max_script_name_len, width2 = max_description_len);
+
+    for (name, script) in &scripts.scripts {
+        let description = match script {
+            Script::Default(_) => "".to_string(),
+            Script::Detailed { info, .. } => info.clone().unwrap_or_else(|| "".to_string()),
+        };
+        println!("{:<width1$} {:<width2$}", name.green(), description, width1 = max_script_name_len, width2 = max_description_len);
+    }
+}
+
 /// Run a script by name, executing any included scripts in sequence.
 /// 
 /// # Arguments
@@ -50,19 +82,41 @@ pub struct Scripts {
 /// * `script_name` - The name of the script to run.
 /// * `env_overrides` - A vector of command line environment variable overrides.
 pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>) {
-    fn run_script_with_level(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>, level: usize) {
+    let script_durations = Arc::new(Mutex::new(HashMap::new()));
+
+    fn run_script_with_level(
+        scripts: &Scripts,
+        script_name: &str,
+        env_overrides: Vec<String>,
+        level: usize,
+        script_durations: Arc<Mutex<HashMap<String, Duration>>>,
+    ) {
         let mut env_vars = scripts.global_env.clone().unwrap_or_default();
         let indent = "  ".repeat(level);
+
+        let script_start_time = Instant::now();
 
         if let Some(script) = scripts.scripts.get(script_name) {
             match script {
                 Script::Default(cmd) => {
-                    let msg = format!("{}{}  {}: [ {} ]", indent, symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name);
+                    let msg = format!(
+                        "{}{}  {}: [ {} ]",
+                        indent,
+                        symbols::other_symbol::CHECK_MARK.glyph,
+                        "Running script".green(),
+                        script_name
+                    );
                     println!("{}\n", msg);
                     apply_env_vars(&env_vars, &env_overrides);
                     execute_command(None, cmd);
-                },
-                Script::Detailed { interpreter, command, info, env, include } => {
+                }
+                Script::Detailed {
+                    interpreter,
+                    command,
+                    info,
+                    env,
+                    include,
+                } => {
                     let description = format!(
                         "{}  {}: {}",
                         emoji::objects::book_paper::BOOKMARK_TABS.glyph,
@@ -71,18 +125,37 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     );
 
                     if let Some(include_scripts) = include {
-                        let msg = format!("{}{}  {}: [ {} ]  {}", indent, symbols::other_symbol::CHECK_MARK.glyph,"Running include script".green(), script_name, description);
+                        let msg = format!(
+                            "{}{}  {}: [ {} ]  {}",
+                            indent,
+                            symbols::other_symbol::CHECK_MARK.glyph,
+                            "Running include script".green(),
+                            script_name,
+                            description
+                        );
                         println!("{}\n", msg);
                         for include_script in include_scripts {
-                            run_script_with_level(scripts, include_script, env_overrides.clone(), level + 1);
+                            run_script_with_level(
+                                scripts,
+                                include_script,
+                                env_overrides.clone(),
+                                level + 1,
+                                script_durations.clone(),
+                            );
                         }
-                    } else {
-                        // Print the script message
-                        let msg = format!("{}{}  {}: [ {} ]  {}", indent, symbols::other_symbol::CHECK_MARK.glyph, "Running script".green(), script_name, description);
-                        println!("{}\n", msg);
                     }
 
                     if let Some(cmd) = command {
+                        let msg = format!(
+                            "{}{}  {}: [ {} ]  {}",
+                            indent,
+                            symbols::other_symbol::CHECK_MARK.glyph,
+                            "Running script".green(),
+                            script_name,
+                            description
+                        );
+                        println!("{}\n", msg);
+
                         if let Some(script_env) = env {
                             env_vars.extend(script_env.clone());
                         }
@@ -91,13 +164,39 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     }
                 }
             }
-            println!("\n");
+
+            let script_duration = script_start_time.elapsed();
+            if level > 0 || scripts.scripts.get(script_name).map_or(false, |s| matches!(s, Script::Default(_) | Script::Detailed { command: Some(_), .. })) {
+                script_durations
+                    .lock()
+                    .unwrap()
+                    .insert(script_name.to_string(), script_duration);
+            }
         } else {
-            println!("{}{} {}: [ {} ]", indent,symbols::other_symbol::CROSS_MARK.glyph, "Script not found".red(), script_name);
+            println!(
+                "{}{} {}: [ {} ]",
+                indent,
+                symbols::other_symbol::CROSS_MARK.glyph,
+                "Script not found".red(),
+                script_name
+            );
         }
     }
 
-    run_script_with_level(scripts, script_name, env_overrides, 0);
+    run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone());
+
+    let durations = script_durations.lock().unwrap();
+    let total_duration: Duration = durations.values().cloned().sum();
+    
+    println!("\n");
+    println!("{}", "Scripts Performance".bold().yellow());
+    println!("{}", "-".repeat(80).yellow());
+    for (script, duration) in durations.iter() {
+        println!("✔️  Script: {:<25}  🕒 Running time: {:.2?}", script.green(), duration);
+    }
+    if !durations.is_empty() {
+        println!("\n🕒 Total running time: {:.2?}", total_duration);
+    }
 }
 
 /// Apply environment variables from global, script-specific, and command line overrides.
