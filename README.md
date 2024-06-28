@@ -23,6 +23,7 @@ A CLI tool to run custom scripts in Rust, defined in `Scripts.toml`.
 -   Initialize a `Scripts.toml` file with default content.
 -   Chain multiple scripts together using the `include` feature.
 -   Set global environment variables and script-specific environment variables with precedence handling.
+-   Show detailed information about scripts.
 
 ## Installation
 
@@ -66,7 +67,7 @@ doc = "cargo doc --no-deps --open"
 To run a script, use the following command:
 
 ```sh
-cgs <option> <script_name>
+cgs run <script_name>
 ```
 
 ## Understanding `Scripts.toml`
@@ -157,6 +158,14 @@ To run a script and override environment variables from the command line, use th
 cgs run <script_name> --env <ENV_VAR1>=<value1>
 ```
 
+### Show command
+
+To show all the scripts and their details, use the following command:
+
+```sh
+cgs show
+```
+
 <!-- cargo-rdme end -->
 
 ## Explanation
@@ -172,3 +181,4 @@ cgs run <script_name> --env <ENV_VAR1>=<value1>
 -   **Global Environment Variables**: Explains how to define global environment variables.
 -   **Script-Specific Environment Variables**: Explains how to define script-specific environment variables.
 -   **Environment Variables Precedence**: Explains the order of precedence for environment variables.
+-   **Show Command**: Explains how to show all the scripts and their details.
