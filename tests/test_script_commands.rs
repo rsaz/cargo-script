@@ -2,6 +2,9 @@ use assert_cmd::Command;
 use std::fs;
 use std::process::Command as ProcessCommand;
 
+mod constants;
+use constants::SCRIPT_TOML;
+
 /// Sets up the test scripts by creating a directory and a test script file,
 /// and making the script executable.
 fn setup_test_scripts() {
@@ -30,7 +33,7 @@ fn test_i_am_shell() {
     setup_test_scripts();
 
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    cmd.args(&["run", "i_am_shell", "--scripts-path", "Scripts.toml"])
+    cmd.args(&["run", "i_am_shell", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
         .stdout(predicates::str::contains("Test script executed"));
@@ -44,7 +47,7 @@ fn test_i_am_shell_obj() {
     setup_test_scripts();
 
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    cmd.args(&["run", "i_am_shell_obj", "--scripts-path", "Scripts.toml"])
+    cmd.args(&["run", "i_am_shell_obj", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
         .stdout(predicates::str::contains("Detect shell script"))
@@ -56,7 +59,7 @@ fn test_i_am_shell_obj() {
 #[test]
 fn test_build() {
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    cmd.args(&["run", "build", "--scripts-path", "Scripts.toml"])
+    cmd.args(&["run", "build", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
         .stdout(predicates::str::contains("build"));
@@ -70,7 +73,7 @@ fn test_release() {
     setup_test_scripts();
 
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    cmd.args(&["run", "release", "--scripts-path", "Scripts.toml"])
+    cmd.args(&["run", "release", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
         .stdout(predicates::str::contains("Test script executed"))
@@ -85,7 +88,7 @@ fn test_release_info() {
     setup_test_scripts();
 
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    cmd.args(&["run", "release_info", "--scripts-path", "Scripts.toml"])
+    cmd.args(&["run", "release_info", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
         .stdout(predicates::str::contains("Release info"))
