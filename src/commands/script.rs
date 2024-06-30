@@ -1,3 +1,5 @@
+//! This module provides the functionality to run scripts defined in `Scripts.toml`.
+
 use std::{collections::HashMap, env, process::Command, sync::{Arc, Mutex}, time::{Duration, Instant}};
 use serde::Deserialize;
 use emoji::symbols;
@@ -25,12 +27,19 @@ pub struct Scripts {
 }
 
 /// Run a script by name, executing any included scripts in sequence.
-/// 
+///
+/// This function runs a script and any scripts it includes, measuring the execution time
+/// for each script and printing performance metrics.
+///
 /// # Arguments
 ///
 /// * `scripts` - A reference to the collection of scripts.
 /// * `script_name` - The name of the script to run.
 /// * `env_overrides` - A vector of command line environment variable overrides.
+///
+/// # Panics
+///
+/// This function will panic if it fails to execute the script commands.
 pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>) {
     let script_durations = Arc::new(Mutex::new(HashMap::new()));
 
@@ -150,7 +159,10 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
 }
 
 /// Apply environment variables from global, script-specific, and command line overrides.
-/// 
+///
+/// This function sets the environment variables for the script execution, giving precedence
+/// to command line overrides over script-specific variables, and script-specific variables over global variables.
+///
 /// # Arguments
 ///
 /// * `env_vars` - A reference to the global environment variables.
@@ -170,11 +182,18 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 }
 
 /// Execute a command using the specified interpreter, or the default shell if none is specified.
-/// 
+///
+/// This function runs the command with the appropriate interpreter, depending on the operating system
+/// and the specified interpreter.
+///
 /// # Arguments
 ///
 /// * `interpreter` - An optional string representing the interpreter to use.
 /// * `command` - The command to execute.
+///
+/// # Panics
+///
+/// This function will panic if it fails to execute the command.
 fn execute_command(interpreter: Option<&str>, command: &str) {
     match interpreter {
         Some("bash") => {

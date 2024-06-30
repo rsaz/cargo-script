@@ -1,11 +1,18 @@
+//! This module provides the functionality to display all script names and descriptions.
+
 use crate::commands::script::{Scripts, Script};
 use colored::*;
 
 /// Show all script names and descriptions in a table format.
-/// 
+///
+/// This function prints a table with script names and their descriptions.
+/// It calculates the maximum width for the script names and descriptions
+/// to format the table neatly.
+///
 /// # Arguments
 ///
 /// * `scripts` - A reference to the collection of scripts.
+///
 pub fn show_scripts(scripts: &Scripts) {   
     let mut max_script_name_len = "Script".len();
     let mut max_description_len = "Description".len();

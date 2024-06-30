@@ -1,6 +1,7 @@
 //! This module defines the commands and their execution logic for the cargo-script CLI tool.
 //!
 //! It includes functionalities to run scripts, initialize the Scripts.toml file, and handle script execution.
+
 use clap::{Subcommand, ArgAction};
 
 /// Enum representing the different commands supported by the CLI tool.

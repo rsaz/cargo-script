@@ -17,7 +17,14 @@ struct Cli {
     scripts_path: String,
 }
 
-/// Main function that parses command-line arguments and executes the specified command.
+/// Run unction that parses command-line arguments and executes the specified command.
+///
+/// This function initializes the CLI, parses the command-line arguments, and routes
+/// the commands to their respective handlers.
+///
+/// # Panics
+///
+/// This function will panic if it fails to read or parse the `Scripts.toml` file.
 pub fn run() {
     let init_msg = format!("A CLI tool to run custom scripts in Rust, defined in [ Scripts.toml ] {}", emoji::objects::computer::FLOPPY_DISK.glyph);
     print_framed_message(&init_msg);
@@ -44,6 +51,14 @@ pub fn run() {
 }
 
 /// Prints a framed message with a dashed line frame.
+///
+/// This function prints a framed message to the console, making it more visually
+/// appealing and easier to read.
+///
+/// # Arguments
+///
+/// * `message` - A string slice that holds the message to be framed.
+///
 fn print_framed_message(message: &str) {
     let framed_message = format!("| {} |", message);
     let frame = "-".repeat(framed_message.len()-2);
