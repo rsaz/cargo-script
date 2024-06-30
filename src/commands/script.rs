@@ -1,27 +1,9 @@
-//! This module defines the commands and their execution logic for the cargo-script CLI tool.
-//!
-//! It includes functionalities to run scripts, initialize the Scripts.toml file, and handle script execution.
-use std::{collections::HashMap, env, fs, io, process::Command, sync::{Arc, Mutex}, time::{Duration, Instant}};
-use clap::{Subcommand, ArgAction};
+//! This module provides the functionality to run scripts defined in `Scripts.toml`.
+
+use std::{collections::HashMap, env, process::Command, sync::{Arc, Mutex}, time::{Duration, Instant}};
 use serde::Deserialize;
 use emoji::symbols;
 use colored::*;
-
-/// Enum representing the different commands supported by the CLI tool.
-#[derive(Subcommand, Debug)]
-pub enum Commands {
-    #[command(about = "Run a script by name defined in Scripts.toml")]
-    Run {
-        #[arg(value_name = "SCRIPT_NAME", action = ArgAction::Set)]
-        script: String,
-        #[arg(short, long, value_name = "KEY=VALUE", action = ArgAction::Append)]
-        env: Vec<String>,
-    },
-    #[command(about = "Initialize a Scripts.toml file in the current directory")]
-    Init,
-    #[command(about = "Show all script names and descriptions defined in Scripts.toml")]
-    Show,
-}
 
 /// Enum representing a script, which can be either a default command or a detailed script with additional metadata.
 #[derive(Deserialize, Debug)]
@@ -44,43 +26,20 @@ pub struct Scripts {
     pub scripts: HashMap<String, Script>
 }
 
-/// Show all script names and descriptions in a table format.
-/// 
-/// # Arguments
-///
-/// * `scripts` - A reference to the collection of scripts.
-pub fn show_scripts(scripts: &Scripts) {   
-    let mut max_script_name_len = "Script".len();
-    let mut max_description_len = "Description".len();
-
-    for (name, script) in &scripts.scripts {
-        max_script_name_len = max_script_name_len.max(name.len() + 2);
-        let description = match script {
-            Script::Default(_) => "",
-            Script::Detailed { info, .. } => info.as_deref().unwrap_or(""),
-        };
-        max_description_len = max_description_len.max(description.len() + 2);
-    }
-   
-    println!("{:<width1$} {:<width2$}", "Script".yellow(), "Description".yellow(), width1 = max_script_name_len, width2 = max_description_len);
-    println!("{:<width1$} {:<width2$}", "-".repeat(max_script_name_len).yellow(), "-".repeat(max_description_len).yellow(), width1 = max_script_name_len, width2 = max_description_len);
-
-    for (name, script) in &scripts.scripts {
-        let description = match script {
-            Script::Default(_) => "".to_string(),
-            Script::Detailed { info, .. } => info.clone().unwrap_or_else(|| "".to_string()),
-        };
-        println!("{:<width1$} {:<width2$}", name.green(), description, width1 = max_script_name_len, width2 = max_description_len);
-    }
-}
-
 /// Run a script by name, executing any included scripts in sequence.
-/// 
+///
+/// This function runs a script and any scripts it includes, measuring the execution time
+/// for each script and printing performance metrics.
+///
 /// # Arguments
 ///
 /// * `scripts` - A reference to the collection of scripts.
 /// * `script_name` - The name of the script to run.
 /// * `env_overrides` - A vector of command line environment variable overrides.
+///
+/// # Panics
+///
+/// This function will panic if it fails to execute the script commands.
 pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>) {
     let script_durations = Arc::new(Mutex::new(HashMap::new()));
 
@@ -200,7 +159,10 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
 }
 
 /// Apply environment variables from global, script-specific, and command line overrides.
-/// 
+///
+/// This function sets the environment variables for the script execution, giving precedence
+/// to command line overrides over script-specific variables, and script-specific variables over global variables.
+///
 /// # Arguments
 ///
 /// * `env_vars` - A reference to the global environment variables.
@@ -220,11 +182,18 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 }
 
 /// Execute a command using the specified interpreter, or the default shell if none is specified.
-/// 
+///
+/// This function runs the command with the appropriate interpreter, depending on the operating system
+/// and the specified interpreter.
+///
 /// # Arguments
 ///
 /// * `interpreter` - An optional string representing the interpreter to use.
 /// * `command` - The command to execute.
+///
+/// # Panics
+///
+/// This function will panic if it fails to execute the command.
 fn execute_command(interpreter: Option<&str>, command: &str) {
     match interpreter {
         Some("bash") => {
@@ -275,31 +244,4 @@ fn execute_command(interpreter: Option<&str>, command: &str) {
             }
         }
     }
-}
-
-/// Initialize a Scripts.toml file in the current directory.
-/// If the file already exists, prompt the user for confirmation to replace it.
-pub fn init_script_file() {
-    let file_path = "Scripts.toml";
-    if fs::metadata(file_path).is_ok() {
-        println!("{}  [ {} ] already exists. Do you want to replace it? ({}/{})", symbols::warning::WARNING.glyph, file_path.yellow(), "y".green(), "n".red());
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("Failed to read input");
-        if input.trim().to_lowercase() != "y" {
-            println!("Operation cancelled.");
-            return;
-        }
-    }
-    let default_content = r#"
-[global_env]
-
-[scripts]
-dev = "cargo run"
-build = { command = "cargo build", env = { RUST_LOG = "info" } }
-release = "cargo build --release"
-test = { command = "cargo test", env = { RUST_LOG = "warn" } }
-doc = "cargo doc --no-deps --open"
-"#;
-    fs::write(file_path, default_content).expect("Failed to write Scripts.toml");
-    println!("{}  [ {} ] has been created.", symbols::other_symbol::CHECK_MARK.glyph, "Scripts.toml".green());
 }
