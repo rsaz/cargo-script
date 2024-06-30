@@ -1,7 +1,7 @@
 //! This module contains the main logic for the cargo-script CLI tool.
 //!
 //! It parses the command-line arguments and executes the appropriate commands.
-use crate::commands::{init_script_file, run_script, show_scripts, Commands, Scripts};
+use crate::commands::{init::init_script_file, script::run_script, Commands, script::Scripts, show::show_scripts};
 use std::fs;
 use clap::Parser;
 use colored::*;
