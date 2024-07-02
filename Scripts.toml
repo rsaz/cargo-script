@@ -2,13 +2,13 @@
 [global_env]
 
 [scripts]
-dev = "cargo run"
-build = { command = "cargo build", env = { RUST_LOG = "info" } }
-release = "cargo build --release"
+dev = { command = "cargo run", env = { RUST_LOG = "debug" }, info = "Run cargo run with RUST_LOG=debug" }
+build = { command = "cargo build", env = { RUST_LOG = "info" }, info = "Run cargo build" }
+release = { command = "cargo build --release", env = { RUST_LOG = "info" }, info = "Run cargo build --release" }
 test = { command = "cargo test", env = { RUST_LOG = "warn" }, info = "Run cargo test with RUST_LOG=warn" }
+prepublish_clean = { command = "cargo clean", info = "Run cargo clean to remove target directory" }
+prepublish_doc = { command = "cargo doc --no-deps", info = "Run cargo doc --no-deps to generate documentation" }
 prepublish_dry = { command = "cargo publish --dry-run", info = "Run cargo publish --dry-run to check if everything is fine before publishing" }
 prepublish_check = { command = "cargo package --list", info = "Run cargo package --list to check files to be published" }
 prepublish = { include = ["prepublish_clean", "prepublish_doc", "prepublish_dry", "prepublish_check" ], info = "Run all prepublish tasks"}
-prepublish_clean = { command = "cargo clean", info = "Run cargo clean to remove target directory" }
-prepublish_doc = { command = "cargo doc --no-deps", info = "Run cargo doc --no-deps to generate documentation" }
-publish = { command = "cargo publish", info = "Run cargo publish to publish the package" }
+publish = { include = ["prepublish"], info = "Run cargo publish to publish the package" }
