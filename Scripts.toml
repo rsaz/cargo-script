@@ -1,9 +1,10 @@
 
 [global_env]
+ENV_VAR = "value"
 
 [scripts]
 dev = { command = "cargo run", env = { RUST_LOG = "debug" }, info = "Run cargo run with RUST_LOG=debug" }
-build = { command = "cargo build", env = { RUST_LOG = "info" }, info = "Run cargo build" }
+# build = { command = "cargo build", env = { RUST_LOG = "info" }, info = "Run cargo build" }
 release = { command = "cargo build --release", env = { RUST_LOG = "info" }, info = "Run cargo build --release" }
 test = { command = "cargo test", env = { RUST_LOG = "warn" }, info = "Run cargo test with RUST_LOG=warn" }
 prepublish_clean = { command = "cargo clean", info = "Run cargo clean to remove target directory" }
@@ -12,3 +13,21 @@ prepublish_dry = { command = "cargo publish --dry-run", info = "Run cargo publis
 prepublish_check = { command = "cargo package --list", info = "Run cargo package --list to check files to be published" }
 prepublish = { include = ["prepublish_clean", "prepublish_doc", "prepublish_dry", "prepublish_check" ], info = "Run all prepublish tasks"}
 publish = { include = ["prepublish"], info = "Run cargo publish to publish the package" }
+
+[scripts.build] 
+command = "cargo build"
+info = "Run cargo build to build the package"
+
+[scripts.test01]
+command = "cargo run"
+requires = ["rustup < 1.24.3"]
+toolchain = "stable"
+info = "Build project with nightly toolchain"
+env = { EXAMPLE_VAR = "build_value" }
+
+[scripts.build_with_python]
+command = "python setup.py build"
+requires = ["python >= 3.8"]
+toolchain = "python:3.8"
+info = "Build project with Python 3.8"
+env = { EXAMPLE_VAR = "build_with_python" }

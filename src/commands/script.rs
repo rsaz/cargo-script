@@ -1,6 +1,6 @@
 //! This module provides the functionality to run scripts defined in `Scripts.toml`.
 
-use std::{collections::HashMap, env, process::Command, sync::{Arc, Mutex}, time::{Duration, Instant}};
+use std::{collections::HashMap, env, process::{Command, Stdio}, sync::{Arc, Mutex}, time::{Duration, Instant}};
 use serde::Deserialize;
 use emoji::symbols;
 use colored::*;
@@ -10,12 +10,24 @@ use colored::*;
 #[serde(untagged)]
 pub enum Script {
     Default(String),
-    Detailed {
-        interpreter: Option<String>,
+    Inline {
         command: Option<String>,
+        requires: Option<Vec<String>>,
+        toolchain: Option<String>,
         info: Option<String>,
         env: Option<HashMap<String, String>>,
         include: Option<Vec<String>>,
+        interpreter: Option<String>,
+    },
+    CILike {
+        script: String,
+        command: Option<String>,
+        requires: Option<Vec<String>>,
+        toolchain: Option<String>,
+        info: Option<String>,
+        env: Option<HashMap<String, String>>,
+        include: Option<Vec<String>>,
+        interpreter: Option<String>,
     }
 }
 
@@ -67,15 +79,32 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     );
                     println!("{}\n", msg);
                     apply_env_vars(&env_vars, &env_overrides);
-                    execute_command(None, cmd);
+                    execute_command(None, cmd, None);
                 }
-                Script::Detailed {
-                    interpreter,
+                Script::Inline {
                     command,
                     info,
                     env,
                     include,
+                    interpreter,
+                    requires,
+                    toolchain,
+                    ..
+                } | Script::CILike {
+                    command,
+                    info,
+                    env,
+                    include,
+                    interpreter,
+                    requires,
+                    toolchain,
+                    ..
                 } => {
+                    if let Err(e) = check_requirements(requires.as_deref().unwrap_or(&[]), toolchain.as_ref()) {
+                        eprintln!("{} {}: {}", symbols::other_symbol::CROSS_MARK.glyph, "Requirement check failed".red(), e);
+                        return;
+                    }
+
                     let description = format!(
                         "{}  {}: {}",
                         emoji::objects::book_paper::BOOKMARK_TABS.glyph,
@@ -119,13 +148,13 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                             env_vars.extend(script_env.clone());
                         }
                         apply_env_vars(&env_vars, &env_overrides);
-                        execute_command(interpreter.as_deref(), cmd);
+                        execute_command(interpreter.as_deref(), cmd, toolchain.as_deref());
                     }
                 }
             }
 
             let script_duration = script_start_time.elapsed();
-            if level > 0 || scripts.scripts.get(script_name).map_or(false, |s| matches!(s, Script::Default(_) | Script::Detailed { command: Some(_), .. })) {
+            if level > 0 || scripts.scripts.get(script_name).map_or(false, |s| matches!(s, Script::Default(_) | Script::Inline { command: Some(_), .. } | Script::CILike { command: Some(_), .. })) {
                 script_durations
                     .lock()
                     .unwrap()
@@ -145,18 +174,21 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
     run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone());
 
     let durations = script_durations.lock().unwrap();
-    let total_duration: Duration = durations.values().cloned().sum();
-    
-    println!("\n");
-    println!("{}", "Scripts Performance".bold().yellow());
-    println!("{}", "-".repeat(80).yellow());
-    for (script, duration) in durations.iter() {
-        println!("✔️  Script: {:<25}  🕒 Running time: {:.2?}", script.green(), duration);
-    }
     if !durations.is_empty() {
-        println!("\n🕒 Total running time: {:.2?}", total_duration);
+        let total_duration: Duration = durations.values().cloned().sum();
+        
+        println!("\n");
+        println!("{}", "Scripts Performance".bold().yellow());
+        println!("{}", "-".repeat(80).yellow());
+        for (script, duration) in durations.iter() {
+            println!("✔️  Script: {:<25}  🕒 Running time: {:.2?}", script.green(), duration);
+        }
+        if !durations.is_empty() {
+            println!("\n🕒 Total running time: {:.2?}", total_duration);
+        }
     }
 }
+
 
 /// Apply environment variables from global, script-specific, and command line overrides.
 ///
@@ -190,58 +222,133 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 ///
 /// * `interpreter` - An optional string representing the interpreter to use.
 /// * `command` - The command to execute.
+/// * `toolchain` - An optional string representing the toolchain to use.
 ///
 /// # Panics
 ///
 /// This function will panic if it fails to execute the command.
-fn execute_command(interpreter: Option<&str>, command: &str) {
-    match interpreter {
-        Some("bash") => {
-            Command::new("bash")
+fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&str>) {
+    let mut cmd = if let Some(tc) = toolchain {
+        let mut command_with_toolchain = format!("cargo +{} ", tc);
+        command_with_toolchain.push_str(command);
+        Command::new("sh")
+            .arg("-c")
+            .arg(command_with_toolchain)
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("Failed to execute command")
+    } else {
+        match interpreter {
+            Some("bash") => Command::new("bash")
                 .arg("-c")
                 .arg(command)
-                .status()
-                .expect("Failed to execute script using bash");
-        }
-        Some("zsh") => {
-            Command::new("zsh")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("Failed to execute script using bash"),
+            Some("zsh") => Command::new("zsh")
                 .arg("-c")
                 .arg(command)
-                .status()
-                .expect("Failed to execute script using zsh");
-        }
-        Some("powershell") => {
-            Command::new("powershell")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("Failed to execute script using zsh"),
+            Some("powershell") => Command::new("powershell")
                 .args(&["-Command", command])
-                .status()
-                .expect("Failed to execute script using PowerShell");
-        }
-        Some("cmd") => {
-            Command::new("cmd")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("Failed to execute script using PowerShell"),
+            Some("cmd") => Command::new("cmd")
                 .args(&["/C", command])
-                .status()
-                .expect("Failed to execute script using cmd");
-        }
-        Some(other) => {
-            Command::new(other)
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("Failed to execute script using cmd"),
+            Some(other) => Command::new(other)
                 .arg("-c")
                 .arg(command)
-                .status()
-                .expect(&format!("Failed to execute script using {}", other));
-        }
-        None => {
-            if cfg!(target_os = "windows") {
-                Command::new("cmd")
-                    .args(&["/C", command])
-                    .status()
-                    .expect("Failed to execute script using cmd");
-            } else {
-                Command::new("sh")
-                    .arg("-c")
-                    .arg(command)
-                    .status()
-                    .expect("Failed to execute script using sh");
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect(&format!("Failed to execute script using {}", other)),
+            None => {
+                if cfg!(target_os = "windows") {
+                    Command::new("cmd")
+                        .args(&["/C", command])
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
+                        .spawn()
+                        .expect("Failed to execute script using cmd")
+                } else {
+                    Command::new("sh")
+                        .arg("-c")
+                        .arg(command)
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
+                        .spawn()
+                        .expect("Failed to execute script using sh")
+                }
             }
         }
+    };
+
+    cmd.wait().expect("Command wasn't running");
+}
+
+/// Check if the required tools and toolchain are installed.
+/// 
+/// This function checks if the required tools and toolchain are installed on the system.
+/// If any of the requirements are not met, an error message is returned.
+/// 
+/// # Arguments
+/// 
+/// * `requires` - A slice of strings representing the required tools.
+/// * `toolchain` - An optional string representing the required toolchain.
+/// 
+/// # Returns
+/// 
+/// An empty result if all requirements are met, otherwise an error message.
+/// 
+/// # Errors
+/// 
+/// This function will return an error message if any of the requirements are not met.
+fn check_requirements(requires: &[String], toolchain: Option<&String>) -> Result<(), String> {
+    for req in requires {
+        if let Some((tool, version)) = req.split_once(' ') {
+            let output = Command::new(tool)
+                .arg("--version")
+                .output()
+                .map_err(|e| format!("Failed to execute {}: {}", tool, e))?;
+            let output_str = String::from_utf8_lossy(&output.stdout);
+
+            if !output_str.contains(version) {
+                return Err(format!(
+                    "Required version for {} is {}, but found {}",
+                    tool, version, output_str
+                ));
+            }
+        } else {
+            // Just check if the tool is installed
+            Command::new(req)
+                .output()
+                .map_err(|e| format!("Failed to execute {}: {}", req, e))?;
+        }
     }
+
+    if let Some(toolchain) = toolchain {
+        let output = Command::new("rustup")
+            .arg("toolchain")
+            .arg("list")
+            .output()
+            .map_err(|e| format!("Failed to execute rustup: {}", e))?;
+        let output_str = String::from_utf8_lossy(&output.stdout);
+
+        if !output_str.contains(toolchain) {
+            return Err(format!("Required toolchain {} is not installed", toolchain));
+        }
+    }
+
+    Ok(())
 }
