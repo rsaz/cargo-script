@@ -24,6 +24,7 @@ A CLI tool to run custom scripts in Rust, defined in `Scripts.toml`.
 -   Chain multiple scripts together using the `include` feature.
 -   Set global environment variables and script-specific environment variables with precedence handling.
 -   Show detailed information about scripts.
+-   Define scripts requirements and toolchains.
 
 ## Installation
 
@@ -158,6 +159,39 @@ To run a script and override environment variables from the command line, use th
 cgs run <script_name> --env <ENV_VAR1>=<value1>
 ```
 
+### Script Requirements and Toolchains
+
+You can specify the required versions of tools and toolchains for your scripts. If the requirements are not met, the script will not run.
+
+**Inline Configuration:**
+
+```toml
+[scripts]
+deploy = { command = "./deploy.sh", requires = ["docker>=19.03", "kubectl>=1.18"], info = "Deployment script", env = { EXAMPLE_VAR = "deploy_value" } }
+```
+
+**Detailed Configuration:**
+
+```toml
+[scripts.build]
+command = "cargo build"
+info = "Run cargo build"
+
+[scripts.test01]
+command = "cargo run"
+requires = ["rustup < 1.24.3"]
+toolchain = "stable"
+info = "Build project with nightly toolchain"
+env = { EXAMPLE_VAR = "build_value" }
+
+[scripts.build_with_python]
+command = "python setup.py build"
+requires = ["python >= 3.8"]
+toolchain = "python:3.8"
+info = "Build project with Python 3.8"
+env = { EXAMPLE_VAR = "build_with_python" }
+```
+
 ### Show command
 
 To show all the scripts and their details, use the following command:
@@ -182,3 +216,4 @@ cgs show
 -   **Script-Specific Environment Variables**: Explains how to define script-specific environment variables.
 -   **Environment Variables Precedence**: Explains the order of precedence for environment variables.
 -   **Show Command**: Explains how to show all the scripts and their details.
+-   **Script Requirements and Toolchains**: Explains how to specify required tool versions and toolchains for scripts, with examples of both inline and CI/CD-like configurations.
