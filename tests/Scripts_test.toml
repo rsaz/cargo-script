@@ -12,3 +12,31 @@ release_info = { include = ["i_am_shell_obj", "build"], info = "Release info" }
 test01_env = { command = "echo $EXAMPLE_VAR", env = { EXAMPLE_VAR = "change_value" } }
 test02_env = { command = "echo ${RUST_LOG:-unset} ${COMMON_VAR:-unset}", env = { RUST_LOG = "warn" } }
 test03_env = { command = "echo ${EXAMPLE_VAR:-unset} ${RUST_LOG:-unset} ${COMMON_VAR:-unset}", env = { EXAMPLE_VAR = "change_value_again", RUST_LOG = "info" } }
+
+[scripts.test_requires]
+command = "echo Requires Test"
+requires = ["rustup < 1.24.3"]
+info = "Test requires"
+
+[scripts.test_toolchain]
+command = "cargo --version"
+toolchain = "stable"
+info = "Test toolchain"
+
+[scripts.cilike_script]
+script = "test_cilike"
+command = "echo CILike Test"
+info = "Test CILike script"
+
+[scripts.inline_script]
+command = "echo Inline Script Test"
+requires = ["rustup < 1.24.3"]
+toolchain = "stable"
+info = "Test inline script with requires and toolchain"
+
+[scripts.deploy]
+command = "./.scripts/deploy.sh"
+requires = ["docker>=19.03", "kubectl>=1.18"]
+toolchain = "stable"
+info = "Deployment script"
+env = { EXAMPLE_VAR = "deploy_value" }
