@@ -73,7 +73,19 @@ cgs run <script_name>
 
 ## Understanding `Scripts.toml`
 
-The `Scripts.toml` file is used to define scripts. The file is located in the root of the project directory. The following is an example of a `Scripts.toml` file:
+The `Scripts.toml` file is used to define scripts. The file is located in the root of the project directory. Here are all the possible configurations for a script:
+
+-   **command**: The command to run. Can be a string, path to a script.
+-   **interpreter**: The interpreter to use for the script. (e.g., bash, zsh, PowerShell).
+-   **info**: Additional information about the script. (Optional information about the script).
+-   **include**: Chain multiple scripts together. (e.g., ["script1", "script2"]).
+-   **env**: Script-specific environment variables. (e.g., { EXAMPLE_VAR = "example_value" }).
+-   **requires**: Required versions of tools and toolchains. (e.g., ["tool1>=version1", "tool2>=version2"]).
+-   **toolchain**: The toolchain to use for the script. (e.g., "stable", "nightly", "python:3.8").
+
+## Scripts Examples
+
+The following is an example of a `Scripts.toml` file:
 
 ### Simple Script
 
