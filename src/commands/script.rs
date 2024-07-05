@@ -1,9 +1,15 @@
 //! This module provides the functionality to run scripts defined in `Scripts.toml`.
 
-use std::{collections::HashMap, env, process::{Command, Stdio}, sync::{Arc, Mutex}, time::{Duration, Instant}};
-use serde::Deserialize;
-use emoji::symbols;
 use colored::*;
+use emoji::symbols;
+use serde::Deserialize;
+use std::{
+    collections::HashMap,
+    env,
+    process::{Command, Stdio},
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 /// Enum representing a script, which can be either a default command or a detailed script with additional metadata.
 #[derive(Deserialize, Debug)]
@@ -28,14 +34,14 @@ pub enum Script {
         env: Option<HashMap<String, String>>,
         include: Option<Vec<String>>,
         interpreter: Option<String>,
-    }
+    },
 }
 
 /// Struct representing the collection of scripts defined in Scripts.toml.
 #[derive(Deserialize)]
 pub struct Scripts {
     pub global_env: Option<HashMap<String, String>>,
-    pub scripts: HashMap<String, Script>
+    pub scripts: HashMap<String, Script>,
 }
 
 /// Run a script by name, executing any included scripts in sequence.
@@ -90,7 +96,8 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     requires,
                     toolchain,
                     ..
-                } | Script::CILike {
+                }
+                | Script::CILike {
                     command,
                     info,
                     env,
@@ -100,8 +107,15 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     toolchain,
                     ..
                 } => {
-                    if let Err(e) = check_requirements(requires.as_deref().unwrap_or(&[]), toolchain.as_ref()) {
-                        eprintln!("{} {}: {}", symbols::other_symbol::CROSS_MARK.glyph, "Requirement check failed".red(), e);
+                    if let Err(e) =
+                        check_requirements(requires.as_deref().unwrap_or(&[]), toolchain.as_ref())
+                    {
+                        eprintln!(
+                            "{} {}: {}",
+                            symbols::other_symbol::CROSS_MARK.glyph,
+                            "Requirement check failed".red(),
+                            e
+                        );
                         return;
                     }
 
@@ -154,7 +168,22 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
             }
 
             let script_duration = script_start_time.elapsed();
-            if level > 0 || scripts.scripts.get(script_name).map_or(false, |s| matches!(s, Script::Default(_) | Script::Inline { command: Some(_), .. } | Script::CILike { command: Some(_), .. })) {
+            if level > 0
+                || scripts.scripts.get(script_name).map_or(false, |s| {
+                    matches!(
+                        s,
+                        Script::Default(_)
+                            | Script::Inline {
+                                command: Some(_),
+                                ..
+                            }
+                            | Script::CILike {
+                                command: Some(_),
+                                ..
+                            }
+                    )
+                })
+            {
                 script_durations
                     .lock()
                     .unwrap()
@@ -171,24 +200,33 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
         }
     }
 
-    run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone());
+    run_script_with_level(
+        scripts,
+        script_name,
+        env_overrides,
+        0,
+        script_durations.clone(),
+    );
 
     let durations = script_durations.lock().unwrap();
     if !durations.is_empty() {
         let total_duration: Duration = durations.values().cloned().sum();
-        
+
         println!("\n");
         println!("{}", "Scripts Performance".bold().yellow());
         println!("{}", "-".repeat(80).yellow());
         for (script, duration) in durations.iter() {
-            println!("✔️  Script: {:<25}  🕒 Running time: {:.2?}", script.green(), duration);
+            println!(
+                "✔️  Script: {:<25}  🕒 Running time: {:.2?}",
+                script.green(),
+                duration
+            );
         }
         if !durations.is_empty() {
             println!("\n🕒 Total running time: {:.2?}", total_duration);
         }
     }
 }
-
 
 /// Apply environment variables from global, script-specific, and command line overrides.
 ///
@@ -255,13 +293,13 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                 .spawn()
                 .expect("Failed to execute script using zsh"),
             Some("powershell") => Command::new("powershell")
-                .args(&["-Command", command])
+                .args(["-Command", command])
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())
                 .spawn()
                 .expect("Failed to execute script using PowerShell"),
             Some("cmd") => Command::new("cmd")
-                .args(&["/C", command])
+                .args(["/C", command])
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())
                 .spawn()
@@ -272,11 +310,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())
                 .spawn()
-                .expect(&format!("Failed to execute script using {}", other)),
+                .unwrap_or_else(|_| panic!("Failed to execute script using {}", other)),
             None => {
                 if cfg!(target_os = "windows") {
                     Command::new("cmd")
-                        .args(&["/C", command])
+                        .args(["/C", command])
                         .stdout(Stdio::inherit())
                         .stderr(Stdio::inherit())
                         .spawn()
@@ -298,21 +336,21 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
 }
 
 /// Check if the required tools and toolchain are installed.
-/// 
+///
 /// This function checks if the required tools and toolchain are installed on the system.
 /// If any of the requirements are not met, an error message is returned.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `requires` - A slice of strings representing the required tools.
 /// * `toolchain` - An optional string representing the required toolchain.
-/// 
+///
 /// # Returns
-/// 
+///
 /// An empty result if all requirements are met, otherwise an error message.
-/// 
+///
 /// # Errors
-/// 
+///
 /// This function will return an error message if any of the requirements are not met.
 fn check_requirements(requires: &[String], toolchain: Option<&String>) -> Result<(), String> {
     for req in requires {
