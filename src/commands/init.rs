@@ -1,8 +1,8 @@
 //! This module provides the functionality to initialize a `Scripts.toml` file.
 
-use std::{fs, io};
 use colored::*;
 use emoji::symbols;
+use std::{fs, io};
 
 /// Initialize a `Scripts.toml` file in the current directory.
 ///
@@ -15,9 +15,17 @@ use emoji::symbols;
 pub fn init_script_file() {
     let file_path = "Scripts.toml";
     if fs::metadata(file_path).is_ok() {
-        println!("{}  [ {} ] already exists. Do you want to replace it? ({}/{})", symbols::warning::WARNING.glyph, file_path.yellow(), "y".green(), "n".red());
+        println!(
+            "{}  [ {} ] already exists. Do you want to replace it? ({}/{})",
+            symbols::warning::WARNING.glyph,
+            file_path.yellow(),
+            "y".green(),
+            "n".red()
+        );
         let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("Failed to read input");
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read input");
         if input.trim().to_lowercase() != "y" {
             println!("Operation cancelled.");
             return;
@@ -34,5 +42,9 @@ test = { command = "cargo test", env = { RUST_LOG = "warn" } }
 doc = "cargo doc --no-deps --open"
 "#;
     fs::write(file_path, default_content).expect("Failed to write Scripts.toml");
-    println!("{}  [ {} ] has been created.", symbols::other_symbol::CHECK_MARK.glyph, "Scripts.toml".green());
+    println!(
+        "{}  [ {} ] has been created.",
+        symbols::other_symbol::CHECK_MARK.glyph,
+        "Scripts.toml".green()
+    );
 }

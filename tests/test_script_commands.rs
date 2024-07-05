@@ -95,4 +95,3 @@ fn test_release_info() {
         .stdout(predicates::str::contains("Test script executed"))
         .stdout(predicates::str::contains("build"));
 }
-

@@ -1,6 +1,6 @@
 //! This module provides the functionality to display all script names and descriptions.
 
-use crate::commands::script::{Scripts, Script};
+use crate::commands::script::{Script, Scripts};
 use colored::*;
 
 /// Show all script names and descriptions in a table format.
@@ -21,19 +21,41 @@ pub fn show_scripts(scripts: &Scripts) {
         max_script_name_len = max_script_name_len.max(name.len() + 2);
         let description = match script {
             Script::Default(_) => "",
-            Script::Inline { info, .. } | Script::CILike { info, .. } => info.as_deref().unwrap_or(""),
+            Script::Inline { info, .. } | Script::CILike { info, .. } => {
+                info.as_deref().unwrap_or("")
+            }
         };
         max_description_len = max_description_len.max(description.len() + 2);
     }
 
-    println!("{:<width1$} {:<width2$}", "Script".yellow(), "Description".yellow(), width1 = max_script_name_len, width2 = max_description_len);
-    println!("{:<width1$} {:<width2$}", "-".repeat(max_script_name_len).yellow(), "-".repeat(max_description_len).yellow(), width1 = max_script_name_len, width2 = max_description_len);
+    println!(
+        "{:<width1$} {:<width2$}",
+        "Script".yellow(),
+        "Description".yellow(),
+        width1 = max_script_name_len,
+        width2 = max_description_len
+    );
+    println!(
+        "{:<width1$} {:<width2$}",
+        "-".repeat(max_script_name_len).yellow(),
+        "-".repeat(max_description_len).yellow(),
+        width1 = max_script_name_len,
+        width2 = max_description_len
+    );
 
     for (name, script) in &scripts.scripts {
         let description = match script {
             Script::Default(_) => "".to_string(),
-            Script::Inline { info, .. } | Script::CILike { info, .. } => info.clone().unwrap_or_else(|| "".to_string()),
+            Script::Inline { info, .. } | Script::CILike { info, .. } => {
+                info.clone().unwrap_or_else(|| "".to_string())
+            }
         };
-        println!("{:<width1$} {:<width2$}", name.green(), description, width1 = max_script_name_len, width2 = max_description_len);
+        println!(
+            "{:<width1$} {:<width2$}",
+            name.green(),
+            description,
+            width1 = max_script_name_len,
+            width2 = max_description_len
+        );
     }
 }

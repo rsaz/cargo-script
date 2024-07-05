@@ -11,16 +11,13 @@ readme = "README.md"
 repository = "https://github.com/rsaz/cargo-script"
 homepage = "https://github.com/rsaz/cargo-script"
 rust-version = "1.79"
+default-run = "cargo-script"
 
-include = [
-    "Cargo.toml",
-    "README.md",
-    "src/**",
-]
+include = ["Cargo.toml", "README.md", "src/**"]
 
 [dependencies]
-clap = { version = "4.5.7", features = ["derive"]}
-serde = { version = "1.0.203", features = ["derive"]}
+clap = { version = "4.5.7", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive"] }
 toml = "0.8.14"
 colored = "2.1.0"
 emoji = "0.2.1"
@@ -36,9 +33,3 @@ path = "src/main.rs"
 [[bin]]
 name = "cgs"
 path = "src/cgs.rs"
-
-
-
-
-
-

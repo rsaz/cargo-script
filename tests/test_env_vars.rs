@@ -21,7 +21,6 @@ fn test01_env() {
         .stdout(predicates::str::contains("change_value"));
 }
 
-
 /// Tests the `test02_env` script defined in `Scripts.toml`.
 /// This script overrides the global `RUST_LOG` value.
 #[test]

@@ -3,13 +3,13 @@ use assert_cmd::Command;
 mod constants;
 use constants::SCRIPT_TOML;
 
-
 /// Tests the `test_requires` script defined in `Scripts.toml`.
 /// This script requires a specific version of a tool (e.g., rustup).
 #[test]
 fn test_requires() {
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    let output = cmd.args(&["run", "test_requires", "--scripts-path", SCRIPT_TOML])
+    let output = cmd
+        .args(&["run", "test_requires", "--scripts-path", SCRIPT_TOML])
         .output()
         .expect("Failed to execute command");
 
@@ -34,7 +34,8 @@ fn test_cilike_script() {
 #[test]
 fn test_inline_script() {
     let mut cmd = Command::cargo_bin("cargo-script").unwrap();
-    let output = cmd.args(&["run", "inline_script", "--scripts-path", SCRIPT_TOML])
+    let output = cmd
+        .args(&["run", "inline_script", "--scripts-path", SCRIPT_TOML])
         .output()
         .expect("Failed to execute command");
 
