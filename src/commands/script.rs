@@ -78,8 +78,9 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                         script_name
                     );
                     println!("{}\n", msg);
+                    let final_env = get_final_env(&env_vars, &env_overrides);
                     apply_env_vars(&env_vars, &env_overrides);
-                    execute_command(None, cmd, None);
+                    execute_command(None, cmd, None, &final_env);
                 }
                 Script::Inline {
                     command,
@@ -147,8 +148,9 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                         if let Some(script_env) = env {
                             env_vars.extend(script_env.clone());
                         }
+                        let final_env = get_final_env(&env_vars, &env_overrides);
                         apply_env_vars(&env_vars, &env_overrides);
-                        execute_command(interpreter.as_deref(), cmd, toolchain.as_deref());
+                        execute_command(interpreter.as_deref(), cmd, toolchain.as_deref(), &final_env);
                     }
                 }
             }
@@ -190,6 +192,31 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
 }
 
 
+/// Get the final environment variables map from global, script-specific, and command line overrides.
+///
+/// This function computes the final environment variables, giving precedence
+/// to command line overrides over script-specific variables, and script-specific variables over global variables.
+///
+/// # Arguments
+///
+/// * `env_vars` - A reference to the global environment variables.
+/// * `env_overrides` - A vector of command line environment variable overrides.
+///
+/// # Returns
+///
+/// A HashMap containing the final environment variables.
+fn get_final_env(env_vars: &HashMap<String, String>, env_overrides: &[String]) -> HashMap<String, String> {
+    let mut final_env = env_vars.clone();
+
+    for override_str in env_overrides {
+        if let Some((key, value)) = override_str.split_once('=') {
+            final_env.insert(key.to_string(), value.to_string());
+        }
+    }
+
+    final_env
+}
+
 /// Apply environment variables from global, script-specific, and command line overrides.
 ///
 /// This function sets the environment variables for the script execution, giving precedence
@@ -200,16 +227,15 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
 /// * `env_vars` - A reference to the global environment variables.
 /// * `env_overrides` - A vector of command line environment variable overrides.
 fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) {
-    let mut final_env = env_vars.clone();
-
-    for override_str in env_overrides {
-        if let Some((key, value)) = override_str.split_once('=') {
-            final_env.insert(key.to_string(), value.to_string());
-        }
-    }
+    let final_env = get_final_env(env_vars, env_overrides);
 
     for (key, value) in &final_env {
-        env::set_var(key, value);
+        // SAFETY: Setting environment variables for child processes is safe.
+        // We're in a single-threaded context when setting these variables,
+        // and they're only used for the child process spawned immediately after.
+        unsafe {
+            env::set_var(key, value);
+        }
     }
 }
 
@@ -223,71 +249,106 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 /// * `interpreter` - An optional string representing the interpreter to use.
 /// * `command` - The command to execute.
 /// * `toolchain` - An optional string representing the toolchain to use.
+/// * `env_vars` - A reference to the environment variables to set for the command.
 ///
 /// # Panics
 ///
 /// This function will panic if it fails to execute the command.
-fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&str>) {
+fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&str>, env_vars: &HashMap<String, String>) {
     let mut cmd = if let Some(tc) = toolchain {
         let mut command_with_toolchain = format!("cargo +{} ", tc);
         command_with_toolchain.push_str(command);
-        Command::new("sh")
-            .arg("-c")
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c")
             .arg(command_with_toolchain)
             .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .spawn()
+            .stderr(Stdio::inherit());
+        for (key, value) in env_vars {
+            cmd.env(key, value);
+        }
+        cmd.spawn()
             .expect("Failed to execute command")
     } else {
         match interpreter {
-            Some("bash") => Command::new("bash")
-                .arg("-c")
-                .arg(command)
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .expect("Failed to execute script using bash"),
-            Some("zsh") => Command::new("zsh")
-                .arg("-c")
-                .arg(command)
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .expect("Failed to execute script using zsh"),
-            Some("powershell") => Command::new("powershell")
-                .args(&["-Command", command])
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .expect("Failed to execute script using PowerShell"),
-            Some("cmd") => Command::new("cmd")
-                .args(&["/C", command])
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .expect("Failed to execute script using cmd"),
-            Some(other) => Command::new(other)
-                .arg("-c")
-                .arg(command)
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .expect(&format!("Failed to execute script using {}", other)),
+            Some("bash") => {
+                let mut cmd = Command::new("bash");
+                cmd.arg("-c")
+                    .arg(command)
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit());
+                for (key, value) in env_vars {
+                    cmd.env(key, value);
+                }
+                cmd.spawn()
+                    .expect("Failed to execute script using bash")
+            },
+            Some("zsh") => {
+                let mut cmd = Command::new("zsh");
+                cmd.arg("-c")
+                    .arg(command)
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit());
+                for (key, value) in env_vars {
+                    cmd.env(key, value);
+                }
+                cmd.spawn()
+                    .expect("Failed to execute script using zsh")
+            },
+            Some("powershell") => {
+                let mut cmd = Command::new("powershell");
+                cmd.args(&["-NoProfile", "-Command", command])
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit());
+                for (key, value) in env_vars {
+                    cmd.env(key, value);
+                }
+                cmd.spawn()
+                    .expect("Failed to execute script using PowerShell")
+            },
+            Some("cmd") => {
+                let mut cmd = Command::new("cmd");
+                cmd.args(&["/C", command])
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit());
+                for (key, value) in env_vars {
+                    cmd.env(key, value);
+                }
+                cmd.spawn()
+                    .expect("Failed to execute script using cmd")
+            },
+            Some(other) => {
+                let mut cmd = Command::new(other);
+                cmd.arg("-c")
+                    .arg(command)
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit());
+                for (key, value) in env_vars {
+                    cmd.env(key, value);
+                }
+                cmd.spawn()
+                    .expect(&format!("Failed to execute script using {}", other))
+            },
             None => {
                 if cfg!(target_os = "windows") {
-                    Command::new("cmd")
-                        .args(&["/C", command])
+                    let mut cmd = Command::new("cmd");
+                    cmd.args(&["/C", command])
                         .stdout(Stdio::inherit())
-                        .stderr(Stdio::inherit())
-                        .spawn()
+                        .stderr(Stdio::inherit());
+                    for (key, value) in env_vars {
+                        cmd.env(key, value);
+                    }
+                    cmd.spawn()
                         .expect("Failed to execute script using cmd")
                 } else {
-                    Command::new("sh")
-                        .arg("-c")
+                    let mut cmd = Command::new("sh");
+                    cmd.arg("-c")
                         .arg(command)
                         .stdout(Stdio::inherit())
-                        .stderr(Stdio::inherit())
-                        .spawn()
+                        .stderr(Stdio::inherit());
+                    for (key, value) in env_vars {
+                        cmd.env(key, value);
+                    }
+                    cmd.spawn()
                         .expect("Failed to execute script using sh")
                 }
             }

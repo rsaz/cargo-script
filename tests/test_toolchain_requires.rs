@@ -1,4 +1,4 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 
 mod constants;
 use constants::SCRIPT_TOML;
@@ -8,7 +8,7 @@ use constants::SCRIPT_TOML;
 /// This script requires a specific version of a tool (e.g., rustup).
 #[test]
 fn test_requires() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     let output = cmd.args(&["run", "test_requires", "--scripts-path", SCRIPT_TOML])
         .output()
         .expect("Failed to execute command");
@@ -22,7 +22,7 @@ fn test_requires() {
 /// This script uses the CILike format.
 #[test]
 fn test_cilike_script() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "cilike_script", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -33,7 +33,7 @@ fn test_cilike_script() {
 /// This script uses the Inline format and checks for `requires` and `toolchain`.
 #[test]
 fn test_inline_script() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     let output = cmd.args(&["run", "inline_script", "--scripts-path", SCRIPT_TOML])
         .output()
         .expect("Failed to execute command");
