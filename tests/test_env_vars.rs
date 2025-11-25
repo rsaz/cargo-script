@@ -1,4 +1,4 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 use std::fs;
 
 mod constants;
@@ -14,7 +14,7 @@ fn setup_scripts_toml(content: &str) {
 /// This script sets the `EXAMPLE_VAR` to `change_value` and keeps the global `RUST_LOG` value.
 #[test]
 fn test01_env() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "test01_env", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -26,7 +26,7 @@ fn test01_env() {
 /// This script overrides the global `RUST_LOG` value.
 #[test]
 fn test02_env() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "test02_env", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -37,7 +37,7 @@ fn test02_env() {
 /// This script sets `EXAMPLE_VAR` to `change_value_again` and overrides the global `RUST_LOG` value.
 #[test]
 fn test03_env() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "test03_env", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()

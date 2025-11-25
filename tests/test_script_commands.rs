@@ -1,5 +1,6 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 use std::fs;
+#[cfg(not(target_os = "windows"))]
 use std::process::Command as ProcessCommand;
 
 mod constants;
@@ -14,10 +15,14 @@ echo "Test script executed"
     "#;
     fs::create_dir_all(".scripts").unwrap();
     fs::write(".scripts/test_script.sh", script_content).unwrap();
-    ProcessCommand::new("chmod")
-        .args(&["+x", ".scripts/test_script.sh"])
-        .status()
-        .expect("Failed to make test script executable");
+    // On Windows, chmod doesn't exist and files don't need to be made executable
+    #[cfg(not(target_os = "windows"))]
+    {
+        ProcessCommand::new("chmod")
+            .args(&["+x", ".scripts/test_script.sh"])
+            .status()
+            .expect("Failed to make test script executable");
+    }
 }
 
 /// Sets up the Scripts.toml file with the specified content.
@@ -32,7 +37,7 @@ fn setup_scripts_toml(content: &str) {
 fn test_i_am_shell() {
     setup_test_scripts();
 
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "i_am_shell", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -46,7 +51,7 @@ fn test_i_am_shell() {
 fn test_i_am_shell_obj() {
     setup_test_scripts();
 
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "i_am_shell_obj", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -58,7 +63,7 @@ fn test_i_am_shell_obj() {
 /// This script should output "build".
 #[test]
 fn test_build() {
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "build", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -72,7 +77,7 @@ fn test_build() {
 fn test_release() {
     setup_test_scripts();
 
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "release", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
@@ -87,7 +92,7 @@ fn test_release() {
 fn test_release_info() {
     setup_test_scripts();
 
-    let mut cmd = Command::cargo_bin("cargo-script").unwrap();
+    let mut cmd = cargo_bin_cmd!("cargo-script");
     cmd.args(&["run", "release_info", "--scripts-path", SCRIPT_TOML])
         .assert()
         .success()
