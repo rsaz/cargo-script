@@ -21,9 +21,9 @@ include = [
 
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"]}
-clap_complete = "4.5.2"
+clap_complete = "4.5.61"
 serde = { version = "1.0.203", features = ["derive"]}
-toml = "0.8.14"
+toml = "0.8.23"
 colored = "2.1.0"
 emoji = "0.2.1"
 
