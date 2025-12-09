@@ -9,11 +9,15 @@ use emoji::symbols;
 /// If the file already exists, it prompts the user for confirmation to replace it.
 /// The function creates a default `Scripts.toml` file if the user agrees.
 ///
+/// # Arguments
+///
+/// * `file_path` - Optional path to the Scripts.toml file. Defaults to "Scripts.toml" if None.
+///
 /// # Panics
 ///
 /// This function will panic if it fails to read user input or write to the `Scripts.toml` file.
-pub fn init_script_file() {
-    let file_path = "Scripts.toml";
+pub fn init_script_file(file_path: Option<&str>) {
+    let file_path = file_path.unwrap_or("Scripts.toml");
     if fs::metadata(file_path).is_ok() {
         println!("{}  [ {} ] already exists. Do you want to replace it? ({}/{})", symbols::warning::WARNING.glyph, file_path.yellow(), "y".green(), "n".red());
         let mut input = String::new();

@@ -35,7 +35,39 @@ pub fn run_with_error_handling() {
 ///
 /// Returns an error if it fails to read or parse the `Scripts.toml` file.
 pub fn run() -> Result<(), CargoScriptError> {
-    let cli = Cli::parse();
+    // Handle Cargo subcommand invocation
+    // When invoked as `cargo script`, Cargo passes "script" as the first argument
+    // We need to remove it before parsing
+    let args: Vec<String> = std::env::args().collect();
+    let cli = if args.len() > 1 && args[1] == "script" {
+        // Remove "script" argument when invoked as `cargo script`
+        // Also need to include the binary name for clap
+        let mut cargo_args = vec![args[0].clone()]; // binary name
+        cargo_args.extend(args.into_iter().skip(2)); // skip "cargo-script" and "script"
+        
+        // If no arguments after "script", show help
+        if cargo_args.len() == 1 {
+            // Only binary name, no subcommand - show help
+            let mut app = Cli::command();
+            app.print_help().unwrap();
+            std::process::exit(0);
+        }
+        
+        // Check for help flag before parsing
+        if cargo_args.len() == 2 && (cargo_args[1] == "--help" || cargo_args[1] == "-h") {
+            let mut app = Cli::command();
+            app.print_help().unwrap();
+            std::process::exit(0);
+        }
+        
+        Cli::try_parse_from(cargo_args).unwrap_or_else(|e| {
+            // Let clap handle the error (will show usage)
+            e.exit()
+        })
+    } else {
+        // Normal invocation: `cargo-script` or `cgs`
+        Cli::parse()
+    };
     
     // Don't show banner for completions or dry-run commands (they interfere with output)
     if !matches!(cli.command, Commands::Completions { .. } | Commands::Run { dry_run: true, .. }) {
@@ -67,7 +99,7 @@ pub fn run() -> Result<(), CargoScriptError> {
             run_script(&scripts, script, env.clone(), *dry_run)?;
         }
         Commands::Init => {
-            init_script_file();
+            init_script_file(Some(scripts_path));
         }
         Commands::Show => {
             let scripts_content = fs::read_to_string(scripts_path)

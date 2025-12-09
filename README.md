@@ -43,43 +43,57 @@
 cargo install cargo-run
 ```
 
-After installation, you'll have two binaries available:
+After installation, you'll have multiple ways to invoke the tool:
 
--   `cargo-script` — Full name
--   `cgs` — Short alias (used in examples below)
+-   `cargo script` — **Recommended**: Use as a Cargo subcommand (e.g., `cargo script run build`)
+-   `cargo-script` — Direct binary invocation
+-   `cgs` — Short alias (used in examples below for brevity)
+
+**Note:** When installed via `cargo install`, the `cargo-script` binary is automatically available in your PATH, enabling `cargo script` subcommand usage.
 
 ## ⚡ Quick Start
 
 1. **Initialize** a `Scripts.toml` file:
 
     ```sh
+    # Using Cargo subcommand (recommended)
+    cargo script init
+
+    # Or using direct binary
     cgs init
     ```
 
 2. **Run** a script:
 
     ```sh
+    # Using Cargo subcommand
+    cargo script run build
+
+    # Or using direct binary
     cgs run build
     ```
 
 3. **Preview** what would run (dry-run):
 
     ```sh
-    cgs run build --dry-run
+    cargo script run build --dry-run
     ```
 
 4. **Validate** your configuration:
 
     ```sh
-    cgs validate
+    cargo script validate
     ```
 
 5. **Show** all available scripts:
+
     ```sh
-    cgs show
+    cargo script show
     ```
 
 That's it! You're ready to go. 🎉
+
+> **💡 Tip:** Using `cargo script` integrates seamlessly with Cargo's ecosystem and provides a familiar interface for Rust developers.
 
 ## 📚 Features
 
@@ -107,6 +121,10 @@ That's it! You're ready to go. 🎉
 Create a new `Scripts.toml` file with sensible defaults:
 
 ```sh
+# Using Cargo subcommand (recommended)
+cargo script init
+
+# Or using direct binary
 cgs init
 ```
 
@@ -126,14 +144,17 @@ doc = "cargo doc --no-deps --open"
 ### Run Scripts
 
 ```sh
+# Using Cargo subcommand (recommended)
+cargo script run build
+
 # Simple script
 cgs run build
 
 # With environment variable override
-cgs run test --env RUST_LOG=debug
+cargo script run test --env RUST_LOG=debug
 
 # Preview execution (dry-run)
-cgs run release --dry-run
+cargo script run release --dry-run
 ```
 
 ### Script Configuration
@@ -232,6 +253,10 @@ test = {
 #### Command-Line Overrides
 
 ```sh
+# Using Cargo subcommand
+cargo script run test --env RUST_LOG=trace
+
+# Or using direct binary
 cgs run test --env RUST_LOG=trace
 ```
 
@@ -244,6 +269,10 @@ cgs run test --env RUST_LOG=trace
 ### Show All Scripts
 
 ```sh
+# Using Cargo subcommand (recommended)
+cargo script show
+
+# Or using direct binary
 cgs show
 ```
 
@@ -262,6 +291,10 @@ Output:
 Preview what would be executed without actually running it:
 
 ```sh
+# Using Cargo subcommand (recommended)
+cargo script run prepublish --dry-run
+
+# Or using direct binary
 cgs run prepublish --dry-run
 ```
 
@@ -296,15 +329,22 @@ Enable tab completion for a better developer experience:
 **Bash:**
 
 ```sh
-cgs completions bash > ~/.bash_completion.d/cgs
+# Using Cargo subcommand (recommended)
+cargo script completions bash > ~/.bash_completion.d/cargo-script
 # Or system-wide:
-cgs completions bash | sudo tee /etc/bash_completion.d/cgs
+cargo script completions bash | sudo tee /etc/bash_completion.d/cargo-script
+
+# Or using direct binary
+cgs completions bash > ~/.bash_completion.d/cgs
 ```
 
 **Zsh:**
 
 ```sh
 mkdir -p ~/.zsh/completions
+# Using Cargo subcommand (recommended)
+cargo script completions zsh > ~/.zsh/completions/_cargo-script
+# Or using direct binary
 cgs completions zsh > ~/.zsh/completions/_cgs
 # Add to ~/.zshrc:
 fpath=(~/.zsh/completions $fpath)
@@ -314,14 +354,18 @@ autoload -U compinit && compinit
 **Fish:**
 
 ```sh
+# Using Cargo subcommand (recommended)
+cargo script completions fish > ~/.config/fish/completions/cargo-script.fish
+# Or using direct binary
 cgs completions fish > ~/.config/fish/completions/cgs.fish
 ```
 
 **PowerShell:**
 
 ```powershell
-cgs completions power-shell > $PROFILE
-# Or save to a file:
+# Using Cargo subcommand (recommended)
+cargo script completions power-shell > $PROFILE
+# Or using direct binary
 cgs completions power-shell > completions.ps1
 . .\completions.ps1
 ```
@@ -333,6 +377,10 @@ After installation, restart your shell and enjoy tab completion! 🎉
 Catch configuration errors before they cause problems:
 
 ```sh
+# Using Cargo subcommand (recommended)
+cargo script validate
+
+# Or using direct binary
 cgs validate
 ```
 
@@ -364,7 +412,7 @@ cgs validate
 ```yaml
 # .github/workflows/ci.yml
 - name: Validate Scripts.toml
-  run: cgs validate
+  run: cargo script validate
 ```
 
 ### Error Messages
@@ -374,7 +422,7 @@ cgs validate
 **Script Not Found:**
 
 ```bash
-$ cgs run buid
+$ cargo script run buid
 ❌ Script not found
 
 Error:
@@ -384,13 +432,13 @@ Did you mean:
   • build
 
 Suggestion:
-  Use 'cgs show' to see all available scripts
+  Use 'cargo script show' to see all available scripts
 ```
 
 **Invalid TOML:**
 
 ```bash
-$ cgs run test
+$ cargo script run test
 ❌ Invalid TOML syntax
 
 Error:
@@ -408,7 +456,7 @@ Suggestion:
 **Missing Tool:**
 
 ```bash
-$ cgs run deploy
+$ cargo script run deploy
 ❌ Required tool not found
 
 Error:
@@ -488,6 +536,10 @@ deploy-production = {
 Use a different `Scripts.toml` file:
 
 ```sh
+# Using Cargo subcommand
+cargo script run build --scripts-path ./config/scripts.toml
+
+# Or using direct binary
 cgs run build --scripts-path ./config/scripts.toml
 ```
 
