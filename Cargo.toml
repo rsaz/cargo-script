@@ -23,8 +23,8 @@ include = [
 clap = { version = "4.5.7", features = ["derive"]}
 clap_complete = "4.5.61"
 serde = { version = "1.0.203", features = ["derive"]}
-toml = "0.8.23"
-colored = "2.1.0"
+toml = "0.9"
+colored = "3.0"
 emoji = "0.2.1"
 
 [dev-dependencies]
