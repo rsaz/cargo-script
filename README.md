@@ -6,7 +6,7 @@
 [![Documentation](https://docs.rs/cargo-run/badge.svg)](https://docs.rs/cargo-run)
 ![Version](https://img.shields.io/badge/rustc-1.79+-ab6000.svg)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/cargo-run.svg)
-[![Dependency Status](https://deps.rs/crate/cargo-run/0.4.0/status.svg)](https://deps.rs/crate/cargo-run/0.4.0)
+[![Dependency Status](https://deps.rs/crate/cargo-run/latest/status.svg)](https://deps.rs/crate/cargo-run/latest)
 <br />
 [![Download](https://img.shields.io/crates/d/cargo-run.svg)](https://crates.io/crates/cargo-run)
 

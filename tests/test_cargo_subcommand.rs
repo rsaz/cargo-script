@@ -2,9 +2,6 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::str::contains;
 use std::fs;
 
-mod constants;
-use constants::SCRIPT_TOML;
-
 /// Sets up a temporary Scripts.toml file with the specified content.
 fn setup_scripts_toml(content: &str, test_name: &str) -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
