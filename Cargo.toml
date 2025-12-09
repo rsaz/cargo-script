@@ -1,16 +1,17 @@
 [package]
 name = "cargo-run"
-description = "A CLI tool to run custom scripts in Rust, defined in Scripts.toml"
+description = "A powerful, fast, and developer-friendly CLI tool for managing project scripts in Rust. Think npm scripts, make, or just — but built specifically for the Rust ecosystem."
 version = "0.4.0"
-edition = "2024"
+edition = "2021"
 authors = ["Richard Zampieri<br.developer@gmail.com>"]
 categories = ["command-line-utilities", "development-tools"]
-keywords = ["command-line", "task", "runner", "development", "utility"]
-license = "MIT/Apache-2.0"
+keywords = ["command-line", "task", "runner", "development", "utility", "scripts", "automation", "ci", "cd"]
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/rsaz/cargo-script"
 homepage = "https://github.com/rsaz/cargo-script"
-rust-version = "1.91"
+documentation = "https://docs.rs/cargo-run"
+rust-version = "1.79"
 
 include = [
     "Cargo.toml",
@@ -20,6 +21,7 @@ include = [
 
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"]}
+clap_complete = "4.5.2"
 serde = { version = "1.0.203", features = ["derive"]}
 toml = "0.8.14"
 colored = "2.1.0"

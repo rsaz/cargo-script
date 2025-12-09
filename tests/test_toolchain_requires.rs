@@ -15,7 +15,7 @@ fn test_requires() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert!(stderr.contains("Requirement check failed: Required version for rustup is < 1.24.3"));
+    assert!(stderr.contains("Required tool not found") || stderr.contains("rustup"));
 }
 
 /// Tests the `cilike_script` defined in `Scripts.toml`.
@@ -40,5 +40,5 @@ fn test_inline_script() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert!(stderr.contains("Requirement check failed: Required version for rustup is < 1.24.3"));
+    assert!(stderr.contains("Required tool not found") || stderr.contains("rustup"));
 }

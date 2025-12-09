@@ -6,51 +6,111 @@
 [![Documentation](https://docs.rs/cargo-run/badge.svg)](https://docs.rs/cargo-run)
 ![Version](https://img.shields.io/badge/rustc-1.79+-ab6000.svg)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/cargo-run.svg)
-[![Dependency Status](https://deps.rs/crate/cargo-run/0.1.0/status.svg)](https://deps.rs/crate/cargo-run/0.1.0)
+[![Dependency Status](https://deps.rs/crate/cargo-run/0.4.0/status.svg)](https://deps.rs/crate/cargo-run/0.4.0)
 <br />
 [![Download](https://img.shields.io/crates/d/cargo-run.svg)](https://crates.io/crates/cargo-run)
 
 <!-- prettier-ignore-end -->
 
-<!-- cargo-rdme start -->
+> **A powerful, fast, and developer-friendly CLI tool for managing project scripts in Rust**  
+> Think `npm scripts`, `make`, or `just` — but built specifically for the Rust ecosystem with modern CLI best practices.
 
-A CLI tool to run custom scripts in Rust, defined in `Scripts.toml`.
+## Why `cargo-run`?
 
-## Features
+**Stop writing one-off shell scripts.** `cargo-run` provides a unified, type-safe way to manage all your project automation:
 
--   Run scripts defined in `Scripts.toml`.
--   Specify interpreters for scripts (e.g., bash, zsh, PowerShell).
--   Initialize a `Scripts.toml` file with default content.
--   Chain multiple scripts together using the `include` feature.
--   Set global environment variables and script-specific environment variables with precedence handling.
--   Show detailed information about scripts.
--   Define scripts requirements and toolchains.
+-   ✅ **Zero runtime dependencies** — Single binary, fast startup
+-   ✅ **Cross-platform** — Works on Windows, macOS, and Linux
+-   ✅ **Modern CLI UX** — Shell completions, dry-run mode, helpful errors
+-   ✅ **Powerful features** — Script chaining, environment variables, toolchain support
+-   ✅ **CI/CD ready** — Validation command catches errors early
+-   ✅ **Rust-native** — Built with Rust, for Rust projects
 
-## Installation
+### Quick Comparison
 
-To install `cargo-run`, use the following command:
+| Feature                | `cargo-run` | `make` | `just` | `npm scripts` |
+| ---------------------- | ----------- | ------ | ------ | ------------- |
+| Zero dependencies      | ✅          | ✅     | ✅     | ❌ (Node.js)  |
+| Shell completions      | ✅          | ⚠️     | ✅     | ✅            |
+| Dry-run mode           | ✅          | ❌     | ✅     | ❌            |
+| Validation             | ✅          | ❌     | ⚠️     | ❌            |
+| Toolchain support      | ✅          | ❌     | ❌     | ❌            |
+| Environment precedence | ✅          | ⚠️     | ⚠️     | ✅            |
+
+## 📦 Installation
 
 ```sh
 cargo install cargo-run
 ```
 
-## Usage
+After installation, you'll have two binaries available:
 
-When `cargo-run` crate is installed it provides a binary `cargo-script` or `cgs` to run custom scripts. Commands can start with `cargo-script` or `cgs`.
+-   `cargo-script` — Full name
+-   `cgs` — Short alias (used in examples below)
 
-The examples below use `cgs` as the command prefix for simplicity.
+## ⚡ Quick Start
+
+1. **Initialize** a `Scripts.toml` file:
+
+    ```sh
+    cgs init
+    ```
+
+2. **Run** a script:
+
+    ```sh
+    cgs run build
+    ```
+
+3. **Preview** what would run (dry-run):
+
+    ```sh
+    cgs run build --dry-run
+    ```
+
+4. **Validate** your configuration:
+
+    ```sh
+    cgs validate
+    ```
+
+5. **Show** all available scripts:
+    ```sh
+    cgs show
+    ```
+
+That's it! You're ready to go. 🎉
+
+## 📚 Features
+
+### Core Features
+
+-   **Script Execution** — Run scripts defined in `Scripts.toml`
+-   **Script Chaining** — Compose complex workflows with `include`
+-   **Environment Variables** — Global, script-specific, and command-line overrides
+-   **Multiple Interpreters** — bash, zsh, PowerShell, cmd, or custom
+-   **Toolchain Support** — Rust toolchains via rustup, Python versions
+-   **Requirements Checking** — Validate tool versions before execution
+
+### Developer Experience
+
+-   **Shell Completions** — Tab completion for bash, zsh, fish, and PowerShell
+-   **Dry-Run Mode** — Preview execution without side effects
+-   **Helpful Errors** — Actionable error messages with suggestions
+-   **Validation** — Catch configuration errors early
+-   **Performance Metrics** — Track script execution times
+
+## 📖 Usage Guide
 
 ### Initialize `Scripts.toml`
 
-The `init` command initializes a `Scripts.toml` file in the root of your project directory with default content. This file is used to define and manage your custom scripts.
-
-To initialize a `Scripts.toml` file, use the following command:
+Create a new `Scripts.toml` file with sensible defaults:
 
 ```sh
 cgs init
 ```
 
-Default `Scripts.toml` content:
+This creates a `Scripts.toml` file with:
 
 ```toml
 [global_env]
@@ -63,169 +123,407 @@ test = { command = "cargo test", env = { RUST_LOG = "warn" } }
 doc = "cargo doc --no-deps --open"
 ```
 
-### Run a Script
-
-To run a script, use the following command:
+### Run Scripts
 
 ```sh
-cgs run <script_name>
+# Simple script
+cgs run build
+
+# With environment variable override
+cgs run test --env RUST_LOG=debug
+
+# Preview execution (dry-run)
+cgs run release --dry-run
 ```
 
-## Understanding `Scripts.toml`
+### Script Configuration
 
-The `Scripts.toml` file is used to define scripts. The file is located in the root of the project directory. Here are all the possible configurations for a script:
-
--   **command**: The command to run. Can be a string, path to a script.
--   **interpreter**: The interpreter to use for the script. (e.g., bash, zsh, PowerShell).
--   **info**: Additional information about the script. (Optional information about the script).
--   **include**: Chain multiple scripts together. (e.g., ["script1", "script2"]).
--   **env**: Script-specific environment variables. (e.g., { EXAMPLE_VAR = "example_value" }).
--   **requires**: Required versions of tools and toolchains. (e.g., ["tool1>=version1", "tool2>=version2"]).
--   **toolchain**: The toolchain to use for the script. (e.g., "stable", "nightly", "python:3.8").
-
-## Scripts Examples
-
-The following is an example of a `Scripts.toml` file:
-
-### Simple Script
-
-A simple script that runs a command directly.
+#### Simple Script
 
 ```toml
 [scripts]
-build = "echo 'build'"
+build = "cargo build"
 ```
 
-### Script with Interpreter
-
-You can specify an interpreter for the script.
+#### Script with Metadata
 
 ```toml
 [scripts]
-config = { interpreter = "bash", command = "echo 'test'", info = "Script to test" }
+build = {
+    command = "cargo build",
+    info = "Build the project in release mode",
+    env = { RUST_LOG = "info" }
+}
 ```
 
-### Chain of Scripts
-
-You can chain multiple scripts together using the include feature.
+#### Script with Interpreter
 
 ```toml
 [scripts]
-release = { include = ["i_am_shell", "build"] }
+deploy = {
+    interpreter = "bash",
+    command = "./scripts/deploy.sh",
+    info = "Deploy to production"
+}
 ```
 
-### Detailed Script
-
-A detailed script can include interpreter, command, info, and other scripts to run.
+#### Script Chaining (Includes)
 
 ```toml
 [scripts]
-i_am_shell_obj = { interpreter = "bash", command = "./.scripts/i_am_shell.sh", info = "Detect shell script" }
+prepublish_clean = "cargo clean"
+prepublish_doc = "cargo doc --no-deps"
+prepublish_dry = "cargo publish --dry-run"
+prepublish_check = "cargo package --list"
+
+prepublish = {
+    include = ["prepublish_clean", "prepublish_doc", "prepublish_dry", "prepublish_check"],
+    info = "Run all prepublish checks"
+}
 ```
 
-### Add info to a script
-
-You can add info to a script to provide more details about the script.
+#### Script with Requirements
 
 ```toml
 [scripts]
-build = { command = "cargo build", info = "Build the project" }
+deploy = {
+    command = "./deploy.sh",
+    requires = ["docker >= 19.03", "kubectl >= 1.18"],
+    toolchain = "stable",
+    info = "Deploy application"
+}
 ```
 
-### Global Environment Variables
+#### CI/CD-like Format
 
-You can define global environment variables that will be available to all scripts. Script-specific environment variables can override these global variables.
+```toml
+[scripts.build]
+script = "build"
+command = "cargo build"
+info = "Build the project"
+
+[scripts.test]
+script = "test"
+command = "cargo test"
+requires = ["rustup >= 1.70"]
+toolchain = "stable"
+```
+
+### Environment Variables
+
+#### Global Environment Variables
 
 ```toml
 [global_env]
 RUST_BACKTRACE = "1"
-EXAMPLE_VAR = "example_value"
+RUST_LOG = "info"
 ```
 
-### Script-Specific Environment Variables
-
-You can define script-specific environment variables that will override global environment variables.
+#### Script-Specific Environment Variables
 
 ```toml
 [scripts]
-example01 = { command = "echo $EXAMPLE_VAR", env = { EXAMPLE_VAR = "change_value" } }
-example02 = { command = "echo ${RUST_LOG:-unset} ${COMMON_VAR:-unset}", env = { RUST_LOG = "warn" } }
-example03 = { command = "echo ${EXAMPLE_VAR:-unset} ${RUST_LOG:-unset} ${COMMON_VAR:-unset}", env = { EXAMPLE_VAR = "change_value_again", RUST_LOG = "info" } }
+test = {
+    command = "cargo test",
+    env = { RUST_LOG = "debug" }
+}
 ```
 
-### Environment Variables Precedence
-
-The precedence order for environment variables is as follows:
-
-1. Command-line overrides: Environment variables passed through the command line when running a script.
-2. Script-specific environment variables: Variables defined in the env section of a script.
-3. Global environment variables: Variables defined in the [global_env] section.
-
-This order ensures that command-line overrides have the highest precedence, followed by script-specific variables, and finally global variables.
-
-### Running a Script with Environment Variables
-
-To run a script and override environment variables from the command line, use the following format:
+#### Command-Line Overrides
 
 ```sh
-cgs run <script_name> --env <ENV_VAR1>=<value1>
+cgs run test --env RUST_LOG=trace
 ```
 
-### Script Requirements and Toolchains
+**Precedence Order:**
 
-You can specify the required versions of tools and toolchains for your scripts. If the requirements are not met, the script will not run.
+1. Command-line overrides (`--env`)
+2. Script-specific (`env` in script)
+3. Global (`[global_env]`)
 
-**Inline Configuration:**
-
-```toml
-[scripts]
-deploy = { command = "./deploy.sh", requires = ["docker>=19.03", "kubectl>=1.18"], info = "Deployment script", env = { EXAMPLE_VAR = "deploy_value" } }
-```
-
-**Detailed Configuration:**
-
-```toml
-[scripts.build]
-command = "cargo build"
-info = "Run cargo build"
-
-[scripts.test01]
-command = "cargo run"
-requires = ["rustup < 1.24.3"]
-toolchain = "stable"
-info = "Build project with nightly toolchain"
-env = { EXAMPLE_VAR = "build_value" }
-
-[scripts.build_with_python]
-command = "python setup.py build"
-requires = ["python >= 3.8"]
-toolchain = "python:3.8"
-info = "Build project with Python 3.8"
-env = { EXAMPLE_VAR = "build_with_python" }
-```
-
-### Show command
-
-To show all the scripts and their details, use the following command:
+### Show All Scripts
 
 ```sh
 cgs show
 ```
 
-<!-- cargo-rdme end -->
+Output:
 
-## Explanation
+```
+📋 Available Scripts:
+  • build     - Build the project
+  • test      - Run tests
+  • release   - Build release version
+  • prepublish - Run all prepublish checks
+```
 
--   **Features**: Summarizes the main features of the tool.
--   **Installation**: Provides the command to install the tool.
--   **Usage**: Explains how to run scripts using `cargo-script` or `cgs`.
--   **Initializing `Scripts.toml`**: Explains the purpose of the `init` command and provides the command to initialize the file.
--   **Default `Scripts.toml` Content**: Shows the default content created by the `init` command.
--   **Understanding `Scripts.toml`**: Details different configurations possible in the `Scripts.toml` file, including simple scripts, scripts with interpreters, chained scripts, and detailed scripts.
--   **Example `Scripts.toml` File**: Provides a complete example of a `Scripts.toml` file.
--   **Example Usage**: Shows how to run scripts and initialize the `Scripts.toml` file.
--   **Global Environment Variables**: Explains how to define global environment variables.
--   **Script-Specific Environment Variables**: Explains how to define script-specific environment variables.
--   **Environment Variables Precedence**: Explains the order of precedence for environment variables.
--   **Show Command**: Explains how to show all the scripts and their details.
--   **Script Requirements and Toolchains**: Explains how to specify required tool versions and toolchains for scripts, with examples of both inline and CI/CD-like configurations.
+### Dry-Run Mode
+
+Preview what would be executed without actually running it:
+
+```sh
+cgs run prepublish --dry-run
+```
+
+**Output:**
+
+```
+DRY-RUN MODE: Preview of what would be executed
+================================================================================
+
+📋  Would run script: [ prepublish ]
+    Description: Run all prepublish checks
+    Would run include scripts:
+      📋  Would run script: [ prepublish_clean ]
+          Command: cargo clean
+
+      📋  Would run script: [ prepublish_doc ]
+          Command: cargo doc --no-deps
+
+      📋  Would run script: [ prepublish_dry ]
+          Command: cargo publish --dry-run
+
+      📋  Would run script: [ prepublish_check ]
+          Command: cargo package --list
+
+No commands were actually executed.
+```
+
+### Shell Completions
+
+Enable tab completion for a better developer experience:
+
+**Bash:**
+
+```sh
+cgs completions bash > ~/.bash_completion.d/cgs
+# Or system-wide:
+cgs completions bash | sudo tee /etc/bash_completion.d/cgs
+```
+
+**Zsh:**
+
+```sh
+mkdir -p ~/.zsh/completions
+cgs completions zsh > ~/.zsh/completions/_cgs
+# Add to ~/.zshrc:
+fpath=(~/.zsh/completions $fpath)
+autoload -U compinit && compinit
+```
+
+**Fish:**
+
+```sh
+cgs completions fish > ~/.config/fish/completions/cgs.fish
+```
+
+**PowerShell:**
+
+```powershell
+cgs completions power-shell > $PROFILE
+# Or save to a file:
+cgs completions power-shell > completions.ps1
+. .\completions.ps1
+```
+
+After installation, restart your shell and enjoy tab completion! 🎉
+
+### Validation
+
+Catch configuration errors before they cause problems:
+
+```sh
+cgs validate
+```
+
+**What it checks:**
+
+-   ✅ TOML syntax validity
+-   ✅ Script references in `include` arrays
+-   ✅ Tool requirements (checks if tools are installed)
+-   ✅ Toolchain requirements (checks if Rust/Python toolchains are installed)
+
+**Example output:**
+
+```
+✓ All validations passed!
+```
+
+**With errors:**
+
+```
+❌ Validation Errors:
+  1. Script 'release': Script 'release' references non-existent script 'build'
+  2. Script 'deploy': Required tool 'docker' is not installed or not in PATH
+
+✗ Found 2 error(s)
+```
+
+**CI/CD Integration:**
+
+```yaml
+# .github/workflows/ci.yml
+- name: Validate Scripts.toml
+  run: cgs validate
+```
+
+### Error Messages
+
+`cargo-run` provides helpful, actionable error messages:
+
+**Script Not Found:**
+
+```bash
+$ cgs run buid
+❌ Script not found
+
+Error:
+  Script 'buid' not found in Scripts.toml
+
+Did you mean:
+  • build
+
+Suggestion:
+  Use 'cgs show' to see all available scripts
+```
+
+**Invalid TOML:**
+
+```bash
+$ cgs run test
+❌ Invalid TOML syntax
+
+Error:
+  File: Scripts.toml
+  Message: invalid table header
+  Line 10: See error details above
+
+Suggestion:
+  Check your Scripts.toml syntax. Common issues:
+  - Missing quotes around strings
+  - Trailing commas in arrays
+  - Invalid table syntax
+```
+
+**Missing Tool:**
+
+```bash
+$ cgs run deploy
+❌ Required tool not found
+
+Error:
+  Tool 'docker' is not installed or not in PATH
+
+Suggestion:
+  Install docker and ensure it's available in your PATH
+```
+
+## Use Cases
+
+### Development Workflow
+
+```toml
+[scripts]
+dev = "cargo run"
+test = "cargo test"
+test-watch = { command = "cargo watch -x test", requires = ["cargo-watch"] }
+lint = "cargo clippy -- -D warnings"
+fmt = "cargo fmt --check"
+check = { include = ["fmt", "lint", "test"], info = "Run all checks" }
+```
+
+### CI/CD Pipeline
+
+```toml
+[scripts]
+ci = {
+    include = ["check", "test", "build"],
+    info = "Run CI pipeline"
+}
+
+[scripts.check]
+command = "cargo clippy -- -D warnings"
+
+[scripts.test]
+command = "cargo test --all-features"
+
+[scripts.build]
+command = "cargo build --release"
+```
+
+### Multi-Language Projects
+
+```toml
+[scripts]
+build-rust = "cargo build"
+build-python = {
+    command = "python setup.py build",
+    requires = ["python >= 3.8"],
+    toolchain = "python:3.8"
+}
+build-all = { include = ["build-rust", "build-python"] }
+```
+
+### Deployment Scripts
+
+```toml
+[scripts]
+deploy-staging = {
+    command = "./scripts/deploy.sh staging",
+    requires = ["docker >= 19.03", "kubectl >= 1.18"],
+    env = { ENV = "staging" }
+}
+
+deploy-production = {
+    command = "./scripts/deploy.sh production",
+    requires = ["docker >= 19.03", "kubectl >= 1.18"],
+    env = { ENV = "production" }
+}
+```
+
+## 🔧 Advanced Configuration
+
+### Custom Scripts Path
+
+Use a different `Scripts.toml` file:
+
+```sh
+cgs run build --scripts-path ./config/scripts.toml
+```
+
+### Performance Metrics
+
+Script execution times are automatically tracked and displayed:
+
+```
+Scripts Performance
+--------------------------------------------------------------------------------
+✔️  Script: prepublish_clean        🕒 Running time: 1.23s
+✔️  Script: prepublish_doc          🕒 Running time: 3.45s
+✔️  Script: prepublish_dry          🕒 Running time: 2.10s
+
+🕒 Total running time: 6.78s
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+Licensed under either of
+
+-   Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+-   MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+## 🙏 Acknowledgments
+
+-   Inspired by `npm scripts`, `make`, and `just`
+-   Built with [clap](https://github.com/clap-rs/clap) for excellent CLI experience
+-   Uses [colored](https://github.com/mackwic/colored) for beautiful terminal output
+
+---
+
+**Made with ❤️ for the Rust community**

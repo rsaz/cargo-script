@@ -8,5 +8,5 @@ use cargo_run::start;
 /// This function serves as the entry point for the application, initializing
 /// and running the command-line interface (CLI) by calling `start::run()`.
 fn main() {
-    start::run();
+    start::run_with_error_handling();
 }

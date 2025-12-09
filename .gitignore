@@ -2,3 +2,11 @@
 *.lock
 
 .vscode
+
+# Temporary test files
+Scripts_test_*.toml
+Scripts_invalid.toml
+
+# Generated completion scripts
+*.ps1
+completions.*

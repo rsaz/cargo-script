@@ -38,6 +38,8 @@ pub struct Scripts {
     pub scripts: HashMap<String, Script>
 }
 
+use crate::error::{CargoScriptError, create_tool_not_found_error, create_toolchain_not_found_error};
+
 /// Run a script by name, executing any included scripts in sequence.
 ///
 /// This function runs a script and any scripts it includes, measuring the execution time
@@ -48,11 +50,20 @@ pub struct Scripts {
 /// * `scripts` - A reference to the collection of scripts.
 /// * `script_name` - The name of the script to run.
 /// * `env_overrides` - A vector of command line environment variable overrides.
+/// * `dry_run` - If true, only show what would be executed without actually running it.
 ///
-/// # Panics
+/// # Errors
 ///
-/// This function will panic if it fails to execute the script commands.
-pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>) {
+/// Returns an error if the script is not found or if execution fails.
+pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>, dry_run: bool) -> Result<(), CargoScriptError> {
+    if dry_run {
+        println!("{}", "DRY-RUN MODE: Preview of what would be executed".bold().yellow());
+        println!("{}\n", "=".repeat(80).yellow());
+        dry_run_script(scripts, script_name, env_overrides, 0)?;
+        println!("\n{}", "No commands were actually executed.".italic().green());
+        return Ok(());
+    }
+
     let script_durations = Arc::new(Mutex::new(HashMap::new()));
 
     fn run_script_with_level(
@@ -61,7 +72,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
         env_overrides: Vec<String>,
         level: usize,
         script_durations: Arc<Mutex<HashMap<String, Duration>>>,
-    ) {
+    ) -> Result<(), CargoScriptError> {
         let mut env_vars = scripts.global_env.clone().unwrap_or_default();
         let indent = "  ".repeat(level);
 
@@ -80,7 +91,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     println!("{}\n", msg);
                     let final_env = get_final_env(&env_vars, &env_overrides);
                     apply_env_vars(&env_vars, &env_overrides);
-                    execute_command(None, cmd, None, &final_env);
+                    execute_command(None, cmd, None, &final_env)?;
                 }
                 Script::Inline {
                     command,
@@ -102,8 +113,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     ..
                 } => {
                     if let Err(e) = check_requirements(requires.as_deref().unwrap_or(&[]), toolchain.as_ref()) {
-                        eprintln!("{} {}: {}", symbols::other_symbol::CROSS_MARK.glyph, "Requirement check failed".red(), e);
-                        return;
+                        return Err(e);
                     }
 
                     let description = format!(
@@ -130,7 +140,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                                 env_overrides.clone(),
                                 level + 1,
                                 script_durations.clone(),
-                            );
+                            )?;
                         }
                     }
 
@@ -150,7 +160,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                         }
                         let final_env = get_final_env(&env_vars, &env_overrides);
                         apply_env_vars(&env_vars, &env_overrides);
-                        execute_command(interpreter.as_deref(), cmd, toolchain.as_deref(), &final_env);
+                        execute_command(interpreter.as_deref(), cmd, toolchain.as_deref(), &final_env)?;
                     }
                 }
             }
@@ -162,18 +172,17 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     .unwrap()
                     .insert(script_name.to_string(), script_duration);
             }
+            Ok(())
         } else {
-            println!(
-                "{}{} {}: [ {} ]",
-                indent,
-                symbols::other_symbol::CROSS_MARK.glyph,
-                "Script not found".red(),
-                script_name
-            );
+            let available_scripts: Vec<String> = scripts.scripts.keys().cloned().collect();
+            return Err(CargoScriptError::ScriptNotFound {
+                script_name: script_name.to_string(),
+                available_scripts,
+            });
         }
     }
 
-    run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone());
+    run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone())?;
 
     let durations = script_durations.lock().unwrap();
     if !durations.is_empty() {
@@ -189,6 +198,8 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
             println!("\n🕒 Total running time: {:.2?}", total_duration);
         }
     }
+    
+    Ok(())
 }
 
 
@@ -251,10 +262,10 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 /// * `toolchain` - An optional string representing the toolchain to use.
 /// * `env_vars` - A reference to the environment variables to set for the command.
 ///
-/// # Panics
+/// # Errors
 ///
-/// This function will panic if it fails to execute the command.
-fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&str>, env_vars: &HashMap<String, String>) {
+/// Returns an error if it fails to execute the command.
+fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&str>, env_vars: &HashMap<String, String>) -> Result<(), CargoScriptError> {
     let mut cmd = if let Some(tc) = toolchain {
         let mut command_with_toolchain = format!("cargo +{} ", tc);
         command_with_toolchain.push_str(command);
@@ -267,7 +278,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
             cmd.env(key, value);
         }
         cmd.spawn()
-            .expect("Failed to execute command")
+            .map_err(|e| CargoScriptError::ExecutionError {
+                script: "unknown".to_string(),
+                command: command.to_string(),
+                source: e,
+            })?
     } else {
         match interpreter {
             Some("bash") => {
@@ -280,7 +295,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                     cmd.env(key, value);
                 }
                 cmd.spawn()
-                    .expect("Failed to execute script using bash")
+                    .map_err(|e| CargoScriptError::ExecutionError {
+                        script: "unknown".to_string(),
+                        command: command.to_string(),
+                        source: e,
+                    })?
             },
             Some("zsh") => {
                 let mut cmd = Command::new("zsh");
@@ -292,7 +311,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                     cmd.env(key, value);
                 }
                 cmd.spawn()
-                    .expect("Failed to execute script using zsh")
+                    .map_err(|e| CargoScriptError::ExecutionError {
+                        script: "unknown".to_string(),
+                        command: command.to_string(),
+                        source: e,
+                    })?
             },
             Some("powershell") => {
                 let mut cmd = Command::new("powershell");
@@ -303,7 +326,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                     cmd.env(key, value);
                 }
                 cmd.spawn()
-                    .expect("Failed to execute script using PowerShell")
+                    .map_err(|e| CargoScriptError::ExecutionError {
+                        script: "unknown".to_string(),
+                        command: command.to_string(),
+                        source: e,
+                    })?
             },
             Some("cmd") => {
                 let mut cmd = Command::new("cmd");
@@ -314,7 +341,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                     cmd.env(key, value);
                 }
                 cmd.spawn()
-                    .expect("Failed to execute script using cmd")
+                    .map_err(|e| CargoScriptError::ExecutionError {
+                        script: "unknown".to_string(),
+                        command: command.to_string(),
+                        source: e,
+                    })?
             },
             Some(other) => {
                 let mut cmd = Command::new(other);
@@ -326,7 +357,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                     cmd.env(key, value);
                 }
                 cmd.spawn()
-                    .expect(&format!("Failed to execute script using {}", other))
+                    .map_err(|e| CargoScriptError::ExecutionError {
+                        script: "unknown".to_string(),
+                        command: command.to_string(),
+                        source: e,
+                    })?
             },
             None => {
                 if cfg!(target_os = "windows") {
@@ -338,7 +373,11 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                         cmd.env(key, value);
                     }
                     cmd.spawn()
-                        .expect("Failed to execute script using cmd")
+                        .map_err(|e| CargoScriptError::ExecutionError {
+                            script: "unknown".to_string(),
+                            command: command.to_string(),
+                            source: e,
+                        })?
                 } else {
                     let mut cmd = Command::new("sh");
                     cmd.arg("-c")
@@ -349,13 +388,180 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
                         cmd.env(key, value);
                     }
                     cmd.spawn()
-                        .expect("Failed to execute script using sh")
+                        .map_err(|e| CargoScriptError::ExecutionError {
+                            script: "unknown".to_string(),
+                            command: command.to_string(),
+                            source: e,
+                        })?
                 }
             }
         }
     };
 
-    cmd.wait().expect("Command wasn't running");
+    cmd.wait().map_err(|e| CargoScriptError::ExecutionError {
+        script: "unknown".to_string(),
+        command: command.to_string(),
+        source: e,
+    })?;
+    
+    Ok(())
+}
+
+/// Display what would be executed in dry-run mode without actually running anything.
+///
+/// # Arguments
+///
+/// * `scripts` - A reference to the collection of scripts.
+/// * `script_name` - The name of the script to preview.
+/// * `env_overrides` - A vector of command line environment variable overrides.
+/// * `level` - The nesting level for indentation.
+fn dry_run_script(
+    scripts: &Scripts,
+    script_name: &str,
+    env_overrides: Vec<String>,
+    level: usize,
+) -> Result<(), CargoScriptError> {
+    let indent = "  ".repeat(level);
+    let mut env_vars = scripts.global_env.clone().unwrap_or_default();
+
+    if let Some(script) = scripts.scripts.get(script_name) {
+        match script {
+            Script::Default(cmd) => {
+                println!(
+                    "{}{}  {}: [ {} ]",
+                    indent,
+                    "📋".yellow(),
+                    "Would run script".cyan(),
+                    script_name.bold()
+                );
+                println!("{}    Command: {}", indent, cmd.green());
+                let final_env = get_final_env(&env_vars, &env_overrides);
+                if !final_env.is_empty() {
+                    println!("{}    Environment variables:", indent);
+                    for (key, value) in &final_env {
+                        println!("{}      {} = {}", indent, key.cyan(), value.green());
+                    }
+                }
+                println!();
+            }
+            Script::Inline {
+                command,
+                info,
+                env,
+                include,
+                interpreter,
+                requires,
+                toolchain,
+                ..
+            } | Script::CILike {
+                command,
+                info,
+                env,
+                include,
+                interpreter,
+                requires,
+                toolchain,
+                ..
+            } => {
+                // Check requirements (but don't fail in dry-run, just warn)
+                if let Some(reqs) = requires {
+                    if !reqs.is_empty() {
+                        println!(
+                            "{}{}  {}: [ {} ]",
+                            indent,
+                            "🔍".yellow(),
+                            "Would check requirements".cyan(),
+                            script_name.bold()
+                        );
+                        for req in reqs {
+                            println!("{}      - {}", indent, req.green());
+                        }
+                        println!();
+                    }
+                }
+
+                if let Some(tc) = toolchain {
+                    println!(
+                        "{}{}  {}: {}",
+                        indent,
+                        "🔧".yellow(),
+                        "Would use toolchain".cyan(),
+                        tc.bold().green()
+                    );
+                    println!();
+                }
+
+                if let Some(desc) = info {
+                    println!(
+                        "{}{}  {}: {}",
+                        indent,
+                        "📝".yellow(),
+                        "Description".cyan(),
+                        desc.green()
+                    );
+                    println!();
+                }
+
+                if let Some(include_scripts) = include {
+                    println!(
+                        "{}{}  {}: [ {} ]",
+                        indent,
+                        "📋".yellow(),
+                        "Would run include scripts".cyan(),
+                        script_name.bold()
+                    );
+                    if let Some(desc) = info {
+                        println!("{}    Description: {}", indent, desc.green());
+                    }
+                    println!();
+                    for include_script in include_scripts {
+                        dry_run_script(scripts, include_script, env_overrides.clone(), level + 1)?;
+                    }
+                }
+
+                if let Some(cmd) = command {
+                    println!(
+                        "{}{}  {}: [ {} ]",
+                        indent,
+                        "📋".yellow(),
+                        "Would run script".cyan(),
+                        script_name.bold()
+                    );
+                    
+                    if let Some(interp) = interpreter {
+                        println!("{}    Interpreter: {}", indent, interp.green());
+                    }
+                    
+                    if let Some(tc) = toolchain {
+                        println!("{}    Toolchain: {}", indent, tc.green());
+                    }
+                    
+                    println!("{}    Command: {}", indent, cmd.green());
+                    
+                    if let Some(script_env) = env {
+                        env_vars.extend(script_env.clone());
+                    }
+                    
+                    let final_env = get_final_env(&env_vars, &env_overrides);
+                    if !final_env.is_empty() {
+                        println!("{}    Environment variables:", indent);
+                        for (key, value) in &final_env {
+                            println!("{}      {} = {}", indent, key.cyan(), value.green());
+                        }
+                    }
+                    println!();
+                }
+            }
+        }
+    } else {
+        let available_scripts: Vec<String> = scripts.scripts.keys().cloned().collect();
+        return Err(CargoScriptError::ScriptNotFound {
+            script_name: script_name.to_string(),
+            available_scripts,
+        });
+    }
+    
+    Ok(())
 }
 
 /// Check if the required tools and toolchain are installed.
@@ -370,44 +576,41 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
 /// 
 /// # Returns
 /// 
-/// An empty result if all requirements are met, otherwise an error message.
+/// An empty result if all requirements are met, otherwise an error.
 /// 
 /// # Errors
 /// 
-/// This function will return an error message if any of the requirements are not met.
-fn check_requirements(requires: &[String], toolchain: Option<&String>) -> Result<(), String> {
+/// This function will return an error if any of the requirements are not met.
+fn check_requirements(requires: &[String], toolchain: Option<&String>) -> Result<(), CargoScriptError> {
     for req in requires {
         if let Some((tool, version)) = req.split_once(' ') {
             let output = Command::new(tool)
                 .arg("--version")
                 .output()
-                .map_err(|e| format!("Failed to execute {}: {}", tool, e))?;
+                .map_err(|_| create_tool_not_found_error(tool, Some(version)))?;
             let output_str = String::from_utf8_lossy(&output.stdout);
 
             if !output_str.contains(version) {
-                return Err(format!(
-                    "Required version for {} is {}, but found {}",
-                    tool, version, output_str
-                ));
+                return Err(create_tool_not_found_error(tool, Some(version)));
             }
         } else {
             // Just check if the tool is installed
             Command::new(req)
                 .output()
-                .map_err(|e| format!("Failed to execute {}: {}", req, e))?;
+                .map_err(|_| create_tool_not_found_error(req, None))?;
         }
     }
 
-    if let Some(toolchain) = toolchain {
+    if let Some(tc) = toolchain {
         let output = Command::new("rustup")
             .arg("toolchain")
             .arg("list")
             .output()
-            .map_err(|e| format!("Failed to execute rustup: {}", e))?;
+            .map_err(|_| create_tool_not_found_error("rustup", None))?;
         let output_str = String::from_utf8_lossy(&output.stdout);
 
-        if !output_str.contains(toolchain) {
-            return Err(format!("Required toolchain {} is not installed", toolchain));
+        if !output_str.contains(tc) {
+            return Err(create_toolchain_not_found_error(tc));
         }
     }
 
