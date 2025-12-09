@@ -9,4 +9,7 @@ Scripts_invalid.toml
 
 # Generated completion scripts
 *.ps1
-completions.*
+completions.bash
+completions.zsh
+completions.fish
+completions.ps1
