@@ -103,7 +103,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                     }
                     let final_env = get_final_env(&env_vars, &env_overrides);
                     apply_env_vars(&env_vars, &env_overrides);
-                    execute_command(None, cmd, None, &final_env)?;
+                    execute_command(script_name, None, cmd, None, &final_env)?;
                 }
                 Script::Inline {
                     command,
@@ -183,7 +183,7 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                         }
                         let final_env = get_final_env(&env_vars, &env_overrides);
                         apply_env_vars(&env_vars, &env_overrides);
-                        execute_command(interpreter.as_deref(), cmd, toolchain.as_deref(), &final_env)?;
+                        execute_command(script_name, interpreter.as_deref(), cmd, toolchain.as_deref(), &final_env)?;
                     }
                 }
             }
@@ -281,6 +281,7 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 ///
 /// # Arguments
 ///
+/// * `script_name` - The name of the script being executed (for error messages).
 /// * `interpreter` - An optional string representing the interpreter to use.
 /// * `command` - The command to execute.
 /// * `toolchain` - An optional string representing the toolchain to use.
@@ -289,7 +290,7 @@ fn apply_env_vars(env_vars: &HashMap<String, String>, env_overrides: &[String]) 
 /// # Errors
 ///
 /// Returns an error if it fails to execute the command.
-fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&str>, env_vars: &HashMap<String, String>) -> Result<(), CargoScriptError> {
+fn execute_command(script_name: &str, interpreter: Option<&str>, command: &str, toolchain: Option<&str>, env_vars: &HashMap<String, String>) -> Result<(), CargoScriptError> {
     let mut cmd = if let Some(tc) = toolchain {
         let mut command_with_toolchain = format!("cargo +{} ", tc);
         command_with_toolchain.push_str(command);
@@ -303,7 +304,7 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
         }
         cmd.spawn()
             .map_err(|e| CargoScriptError::ExecutionError {
-                script: "unknown".to_string(),
+                script: script_name.to_string(),
                 command: command.to_string(),
                 source: e,
             })?
@@ -422,11 +423,26 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
         }
     };
 
-    cmd.wait().map_err(|e| CargoScriptError::ExecutionError {
-        script: "unknown".to_string(),
+    let exit_status = cmd.wait().map_err(|e| CargoScriptError::ExecutionError {
+        script: script_name.to_string(),
         command: command.to_string(),
         source: e,
     })?;
+    
+    // Check if command failed and might be a Windows self-replacement issue
+    if !exit_status.success() {
+        let is_self_replace_attempt = cfg!(target_os = "windows")
+            && (command.contains("cargo install --path .") 
+                || command.contains("cargo install --path")
+                || (command.contains("cargo install") && command.contains("--path")));
+        
+        if is_self_replace_attempt {
+            return Err(CargoScriptError::WindowsSelfReplacementError {
+                script: script_name.to_string(),
+                command: command.to_string(),
+            });
+        }
+    }
     
     Ok(())
 }

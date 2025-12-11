@@ -41,6 +41,11 @@ pub enum CargoScriptError {
         command: String,
         source: std::io::Error,
     },
+    /// Windows self-replacement error (trying to replace cargo-script while it's running)
+    WindowsSelfReplacementError {
+        script: String,
+        command: String,
+    },
 }
 
 impl fmt::Display for CargoScriptError {
@@ -161,16 +166,56 @@ impl fmt::Display for CargoScriptError {
                 command,
                 source,
             } => {
+                // Check if this is a Windows self-replacement error
+                let is_windows_self_replace = cfg!(target_os = "windows")
+                    && (command.contains("cargo install --path .") || command.contains("cargo install --path"))
+                    && (source.to_string().contains("Access is denied") 
+                        || source.to_string().contains("os error 5")
+                        || source.to_string().contains("failed to move"));
+
+                if is_windows_self_replace {
+                    write!(
+                        f,
+                        "{}\n\n{}\n  {}\n  {}\n\n{}\n  {}\n  {}\n  {}\n\n{}\n  {}",
+                        "❌ Cannot replace cargo-script while it's running (Windows limitation)".red().bold(),
+                        "Error:".yellow().bold(),
+                        format!("Script: {}", script.bold()).white(),
+                        format!("Command: {}", command).white(),
+                        "Why:".yellow().bold(),
+                        "Windows locks executable files while they're running for security and stability.".white(),
+                        "When cargo-script runs 'cargo install --path .', it tries to replace itself,".white(),
+                        "but Windows prevents this because cargo-script.exe is currently in use.".white(),
+                        "Solution:".yellow().bold(),
+                        format!("Run '{}' directly in your terminal (not via cargo script)", command.green()).white()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{}\n\n{}\n  {}\n  {}\n  {}\n\n{}\n  {}",
+                        "❌ Script execution failed".red().bold(),
+                        "Error:".yellow().bold(),
+                        format!("Script: {}", script.bold()).white(),
+                        format!("Command: {}", command).white(),
+                        format!("Reason: {}", source).white(),
+                        "Suggestion:".yellow().bold(),
+                        "Check the command syntax and ensure all required tools are installed".white()
+                    )
+                }
+            }
+            CargoScriptError::WindowsSelfReplacementError { script, command } => {
                 write!(
                     f,
-                    "{}\n\n{}\n  {}\n  {}\n  {}\n\n{}\n  {}",
-                    "❌ Script execution failed".red().bold(),
+                    "{}\n\n{}\n  {}\n  {}\n\n{}\n  {}\n  {}\n  {}\n\n{}\n  {}",
+                    "❌ Cannot replace cargo-script while it's running (Windows limitation)".red().bold(),
                     "Error:".yellow().bold(),
                     format!("Script: {}", script.bold()).white(),
                     format!("Command: {}", command).white(),
-                    format!("Reason: {}", source).white(),
-                    "Suggestion:".yellow().bold(),
-                    "Check the command syntax and ensure all required tools are installed".white()
+                    "Why:".yellow().bold(),
+                    "Windows locks executable files while they're running for security and stability.".white(),
+                    "When cargo-script runs 'cargo install --path .', it tries to replace itself,".white(),
+                    "but Windows prevents this because cargo-script.exe is currently in use.".white(),
+                    "Solution:".yellow().bold(),
+                    format!("Run '{}' directly in your terminal (not via cargo script)", command.green()).white()
                 )
             }
         }
@@ -182,6 +227,7 @@ impl std::error::Error for CargoScriptError {
         match self {
             CargoScriptError::ScriptFileNotFound { source, .. } => Some(source),
             CargoScriptError::ExecutionError { source, .. } => Some(source),
+            CargoScriptError::WindowsSelfReplacementError { .. } => None,
             _ => None,
         }
     }
