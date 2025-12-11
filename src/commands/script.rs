@@ -4,6 +4,7 @@ use std::{collections::HashMap, env, process::{Command, Stdio}, sync::{Arc, Mute
 use serde::Deserialize;
 use emoji::symbols;
 use colored::*;
+use dialoguer::FuzzySelect;
 
 /// Enum representing a script, which can be either a default command or a detailed script with additional metadata.
 #[derive(Deserialize, Debug)]
@@ -51,16 +52,23 @@ use crate::error::{CargoScriptError, create_tool_not_found_error, create_toolcha
 /// * `script_name` - The name of the script to run.
 /// * `env_overrides` - A vector of command line environment variable overrides.
 /// * `dry_run` - If true, only show what would be executed without actually running it.
+/// * `quiet` - If true, suppress all output except errors.
+/// * `verbose` - If true, show detailed output.
+/// * `show_metrics` - If true, show performance metrics after execution.
 ///
 /// # Errors
 ///
 /// Returns an error if the script is not found or if execution fails.
-pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>, dry_run: bool) -> Result<(), CargoScriptError> {
+pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<String>, dry_run: bool, quiet: bool, verbose: bool, show_metrics: bool) -> Result<(), CargoScriptError> {
     if dry_run {
-        println!("{}", "DRY-RUN MODE: Preview of what would be executed".bold().yellow());
-        println!("{}\n", "=".repeat(80).yellow());
-        dry_run_script(scripts, script_name, env_overrides, 0)?;
-        println!("\n{}", "No commands were actually executed.".italic().green());
+        if !quiet {
+            println!("{}", "DRY-RUN MODE: Preview of what would be executed".bold().yellow());
+            println!("{}\n", "=".repeat(80).yellow());
+        }
+        dry_run_script(scripts, script_name, env_overrides, 0, quiet, verbose)?;
+        if !quiet {
+            println!("\n{}", "No commands were actually executed.".italic().green());
+        }
         return Ok(());
     }
 
@@ -72,6 +80,8 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
         env_overrides: Vec<String>,
         level: usize,
         script_durations: Arc<Mutex<HashMap<String, Duration>>>,
+        quiet: bool,
+        verbose: bool,
     ) -> Result<(), CargoScriptError> {
         let mut env_vars = scripts.global_env.clone().unwrap_or_default();
         let indent = "  ".repeat(level);
@@ -81,14 +91,16 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
         if let Some(script) = scripts.scripts.get(script_name) {
             match script {
                 Script::Default(cmd) => {
-                    let msg = format!(
-                        "{}{}  {}: [ {} ]",
-                        indent,
-                        symbols::other_symbol::CHECK_MARK.glyph,
-                        "Running script".green(),
-                        script_name
-                    );
-                    println!("{}\n", msg);
+                    if !quiet {
+                        let msg = format!(
+                            "{}{}  {}: [ {} ]",
+                            indent,
+                            symbols::other_symbol::CHECK_MARK.glyph,
+                            "Running script".green(),
+                            script_name
+                        );
+                        println!("{}\n", msg);
+                    }
                     let final_env = get_final_env(&env_vars, &env_overrides);
                     apply_env_vars(&env_vars, &env_overrides);
                     execute_command(None, cmd, None, &final_env)?;
@@ -116,23 +128,29 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                         return Err(e);
                     }
 
-                    let description = format!(
-                        "{}  {}: {}",
-                        emoji::objects::book_paper::BOOKMARK_TABS.glyph,
-                        "Description".green(),
-                        info.as_deref().unwrap_or("No description provided")
-                    );
+                    // Always show description unless quiet (not just in verbose mode)
+                    let description = info.as_deref().map(|desc| {
+                        format!(
+                            "{}  {}: {}",
+                            emoji::objects::book_paper::BOOKMARK_TABS.glyph,
+                            "Description".green(),
+                            desc
+                        )
+                    });
 
                     if let Some(include_scripts) = include {
-                        let msg = format!(
-                            "{}{}  {}: [ {} ]  {}",
-                            indent,
-                            symbols::other_symbol::CHECK_MARK.glyph,
-                            "Running include script".green(),
-                            script_name,
-                            description
-                        );
-                        println!("{}\n", msg);
+                        if !quiet {
+                            let desc_str = description.as_deref().unwrap_or("");
+                            let msg = format!(
+                                "{}{}  {}: [ {} ]{}",
+                                indent,
+                                symbols::other_symbol::CHECK_MARK.glyph,
+                                "Running include script".green(),
+                                script_name,
+                                if desc_str.is_empty() { String::new() } else { format!("  {}", desc_str) }
+                            );
+                            println!("{}\n", msg);
+                        }
                         for include_script in include_scripts {
                             run_script_with_level(
                                 scripts,
@@ -140,20 +158,25 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
                                 env_overrides.clone(),
                                 level + 1,
                                 script_durations.clone(),
+                                quiet,
+                                verbose,
                             )?;
                         }
                     }
 
                     if let Some(cmd) = command {
-                        let msg = format!(
-                            "{}{}  {}: [ {} ]  {}",
-                            indent,
-                            symbols::other_symbol::CHECK_MARK.glyph,
-                            "Running script".green(),
-                            script_name,
-                            description
-                        );
-                        println!("{}\n", msg);
+                        if !quiet {
+                            let desc_str = description.as_deref().unwrap_or("");
+                            let msg = format!(
+                                "{}{}  {}: [ {} ]{}",
+                                indent,
+                                symbols::other_symbol::CHECK_MARK.glyph,
+                                "Running script".green(),
+                                script_name,
+                                if desc_str.is_empty() { String::new() } else { format!("  {}", desc_str) }
+                            );
+                            println!("{}\n", msg);
+                        }
 
                         if let Some(script_env) = env {
                             env_vars.extend(script_env.clone());
@@ -182,19 +205,20 @@ pub fn run_script(scripts: &Scripts, script_name: &str, env_overrides: Vec<Strin
         }
     }
 
-    run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone())?;
+    run_script_with_level(scripts, script_name, env_overrides, 0, script_durations.clone(), quiet, verbose)?;
 
-    let durations = script_durations.lock().unwrap();
-    if !durations.is_empty() {
-        let total_duration: Duration = durations.values().cloned().sum();
-        
-        println!("\n");
-        println!("{}", "Scripts Performance".bold().yellow());
-        println!("{}", "-".repeat(80).yellow());
-        for (script, duration) in durations.iter() {
-            println!("✔️  Script: {:<25}  🕒 Running time: {:.2?}", script.green(), duration);
-        }
+    // Show performance metrics only if enabled and not in quiet mode
+    if show_metrics && !quiet {
+        let durations = script_durations.lock().unwrap();
         if !durations.is_empty() {
+            let total_duration: Duration = durations.values().cloned().sum();
+            
+            println!("\n");
+            println!("{}", "Scripts Performance".bold().yellow());
+            println!("{}", "-".repeat(80).yellow());
+            for (script, duration) in durations.iter() {
+                println!("✔️  Script: {:<25}  🕒 Running time: {:.2?}", script.green(), duration);
+            }
             println!("\n🕒 Total running time: {:.2?}", total_duration);
         }
     }
@@ -415,11 +439,15 @@ fn execute_command(interpreter: Option<&str>, command: &str, toolchain: Option<&
 /// * `script_name` - The name of the script to preview.
 /// * `env_overrides` - A vector of command line environment variable overrides.
 /// * `level` - The nesting level for indentation.
+/// * `quiet` - If true, suppress all output except errors.
+/// * `verbose` - If true, show detailed output.
 fn dry_run_script(
     scripts: &Scripts,
     script_name: &str,
     env_overrides: Vec<String>,
     level: usize,
+    quiet: bool,
+    verbose: bool,
 ) -> Result<(), CargoScriptError> {
     let indent = "  ".repeat(level);
     let mut env_vars = scripts.global_env.clone().unwrap_or_default();
@@ -427,22 +455,27 @@ fn dry_run_script(
     if let Some(script) = scripts.scripts.get(script_name) {
         match script {
             Script::Default(cmd) => {
-                println!(
-                    "{}{}  {}: [ {} ]",
-                    indent,
-                    "📋".yellow(),
-                    "Would run script".cyan(),
-                    script_name.bold()
-                );
-                println!("{}    Command: {}", indent, cmd.green());
-                let final_env = get_final_env(&env_vars, &env_overrides);
-                if !final_env.is_empty() {
-                    println!("{}    Environment variables:", indent);
-                    for (key, value) in &final_env {
-                        println!("{}      {} = {}", indent, key.cyan(), value.green());
+                if !quiet {
+                    println!(
+                        "{}{}  {}: [ {} ]",
+                        indent,
+                        "📋".yellow(),
+                        "Would run script".cyan(),
+                        script_name.bold()
+                    );
+                    println!("{}    Command: {}", indent, cmd.green());
+                    let final_env = get_final_env(&env_vars, &env_overrides);
+                    // In dry-run mode, always show environment variables (unless quiet)
+                    if !final_env.is_empty() {
+                        println!("{}    Environment variables:", indent);
+                        for (key, value) in &final_env {
+                            println!("{}      {} = {}", indent, key.cyan(), value.green());
+                        }
+                    }
+                    if level == 0 {
+                        println!(); // Extra spacing for top-level scripts
                     }
                 }
-                println!();
             }
             Script::Inline {
                 command,
@@ -463,93 +496,114 @@ fn dry_run_script(
                 toolchain,
                 ..
             } => {
-                // Check requirements (but don't fail in dry-run, just warn)
-                if let Some(reqs) = requires {
-                    if !reqs.is_empty() {
+                if !quiet {
+                    // Check requirements (but don't fail in dry-run, just warn)
+                    if verbose {
+                        if let Some(reqs) = requires {
+                            if !reqs.is_empty() {
+                                println!(
+                                    "{}{}  {}: [ {} ]",
+                                    indent,
+                                    "🔍".yellow(),
+                                    "Would check requirements".cyan(),
+                                    script_name.bold()
+                                );
+                                for req in reqs {
+                                    println!("{}      - {}", indent, req.green());
+                                }
+                                println!();
+                            }
+                        }
+                    }
+
+                    if verbose {
+                        if let Some(tc) = toolchain {
+                            println!(
+                                "{}{}  {}: {}",
+                                indent,
+                                "🔧".yellow(),
+                                "Would use toolchain".cyan(),
+                                tc.bold().green()
+                            );
+                            println!();
+                        }
+                    }
+
+                    if verbose {
+                        if let Some(desc) = info {
+                            println!(
+                                "{}{}  {}: {}",
+                                indent,
+                                "📝".yellow(),
+                                "Description".cyan(),
+                                desc.green()
+                            );
+                            println!();
+                        }
+                    }
+
+                    if let Some(include_scripts) = include {
                         println!(
                             "{}{}  {}: [ {} ]",
                             indent,
-                            "🔍".yellow(),
-                            "Would check requirements".cyan(),
+                            "📋".yellow(),
+                            "Would run include scripts".cyan(),
                             script_name.bold()
                         );
-                        for req in reqs {
-                            println!("{}      - {}", indent, req.green());
+                        if verbose {
+                            if let Some(desc) = info {
+                                println!("{}    Description: {}", indent, desc.green());
+                            }
                         }
                         println!();
-                    }
-                }
-
-                if let Some(tc) = toolchain {
-                    println!(
-                        "{}{}  {}: {}",
-                        indent,
-                        "🔧".yellow(),
-                        "Would use toolchain".cyan(),
-                        tc.bold().green()
-                    );
-                    println!();
-                }
-
-                if let Some(desc) = info {
-                    println!(
-                        "{}{}  {}: {}",
-                        indent,
-                        "📝".yellow(),
-                        "Description".cyan(),
-                        desc.green()
-                    );
-                    println!();
-                }
-
-                if let Some(include_scripts) = include {
-                    println!(
-                        "{}{}  {}: [ {} ]",
-                        indent,
-                        "📋".yellow(),
-                        "Would run include scripts".cyan(),
-                        script_name.bold()
-                    );
-                    if let Some(desc) = info {
-                        println!("{}    Description: {}", indent, desc.green());
-                    }
-                    println!();
-                    for include_script in include_scripts {
-                        dry_run_script(scripts, include_script, env_overrides.clone(), level + 1)?;
-                    }
-                }
-
-                if let Some(cmd) = command {
-                    println!(
-                        "{}{}  {}: [ {} ]",
-                        indent,
-                        "📋".yellow(),
-                        "Would run script".cyan(),
-                        script_name.bold()
-                    );
-                    
-                    if let Some(interp) = interpreter {
-                        println!("{}    Interpreter: {}", indent, interp.green());
-                    }
-                    
-                    if let Some(tc) = toolchain {
-                        println!("{}    Toolchain: {}", indent, tc.green());
-                    }
-                    
-                    println!("{}    Command: {}", indent, cmd.green());
-                    
-                    if let Some(script_env) = env {
-                        env_vars.extend(script_env.clone());
-                    }
-                    
-                    let final_env = get_final_env(&env_vars, &env_overrides);
-                    if !final_env.is_empty() {
-                        println!("{}    Environment variables:", indent);
-                        for (key, value) in &final_env {
-                            println!("{}      {} = {}", indent, key.cyan(), value.green());
+                        for include_script in include_scripts {
+                            dry_run_script(scripts, include_script, env_overrides.clone(), level + 1, quiet, verbose)?;
                         }
                     }
-                    println!();
+
+                    if let Some(cmd) = command {
+                        println!(
+                            "{}{}  {}: [ {} ]",
+                            indent,
+                            "📋".yellow(),
+                            "Would run script".cyan(),
+                            script_name.bold()
+                        );
+                        
+                        // In dry-run mode, always show interpreter and toolchain (unless quiet)
+                        if let Some(interp) = interpreter {
+                            println!("{}    Interpreter: {}", indent, interp.green());
+                        }
+                        
+                        if let Some(tc) = toolchain {
+                            println!("{}    Toolchain: {}", indent, tc.green());
+                        }
+                        
+                        println!("{}    Command: {}", indent, cmd.green());
+                        
+                        if let Some(script_env) = env {
+                            env_vars.extend(script_env.clone());
+                        }
+                        
+                        let final_env = get_final_env(&env_vars, &env_overrides);
+                        // In dry-run mode, always show environment variables (unless quiet)
+                        if !final_env.is_empty() {
+                            println!("{}    Environment variables:", indent);
+                            for (key, value) in &final_env {
+                                println!("{}      {} = {}", indent, key.cyan(), value.green());
+                            }
+                        }
+                        if level == 0 {
+                            println!(); // Extra spacing for top-level scripts
+                        }
+                    }
+                } else {
+                    // Even in quiet mode, we need to process includes
+                    if let Some(include_scripts) = include {
+                        for include_script in include_scripts {
+                            dry_run_script(scripts, include_script, env_overrides.clone(), level + 1, quiet, verbose)?;
+                        }
+                    }
                 }
             }
         }
@@ -562,6 +616,78 @@ fn dry_run_script(
     }
     
     Ok(())
+}
+
+/// Interactive script selection using fuzzy finder.
+///
+/// This function displays an interactive fuzzy selector for choosing a script to run.
+///
+/// # Arguments
+///
+/// * `scripts` - A reference to the collection of scripts.
+/// * `quiet` - If true, suppress extra output.
+///
+/// # Returns
+///
+/// The selected script name, or an error if selection was cancelled or failed.
+///
+/// # Errors
+///
+/// Returns an error if no scripts are available or if the selection was cancelled.
+pub fn interactive_select_script(scripts: &Scripts, quiet: bool) -> Result<String, CargoScriptError> {
+    if scripts.scripts.is_empty() {
+        return Err(CargoScriptError::ScriptNotFound {
+            script_name: "".to_string(),
+            available_scripts: vec![],
+        });
+    }
+
+    // Prepare script items with descriptions for display
+    let mut items: Vec<(String, String)> = scripts.scripts
+        .iter()
+        .map(|(name, script)| {
+            let description = match script {
+                Script::Default(_) => "".to_string(),
+                Script::Inline { info, .. } | Script::CILike { info, .. } => {
+                    info.clone().unwrap_or_else(|| "".to_string())
+                }
+            };
+            (name.clone(), description)
+        })
+        .collect();
+    
+    // Sort by name for consistent display
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Format items for display
+    let display_items: Vec<String> = items
+        .iter()
+        .map(|(name, desc)| {
+            if desc.is_empty() {
+                name.clone()
+            } else {
+                format!("{} - {}", name, desc)
+            }
+        })
+        .collect();
+
+    if !quiet {
+        println!("{}", "Select a script to run:".cyan().bold());
+        println!();
+    }
+
+    let selection = FuzzySelect::new()
+        .with_prompt("Script")
+        .items(&display_items)
+        .default(0)
+        .interact()
+        .map_err(|e| CargoScriptError::ExecutionError {
+            script: "interactive".to_string(),
+            command: "fuzzy_select".to_string(),
+            source: std::io::Error::new(std::io::ErrorKind::Other, format!("Interactive selection failed: {}", e)),
+        })?;
+
+    Ok(items[selection].0.clone())
 }
 
 /// Check if the required tools and toolchain are installed.

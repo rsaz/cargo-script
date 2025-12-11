@@ -5,22 +5,44 @@
 use clap::{Subcommand, ArgAction, ValueEnum};
 
 /// Enum representing the different commands supported by the CLI tool.
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
-    #[command(about = "Run a script by name defined in Scripts.toml")]
+    #[command(about = "Run a script by name defined in Scripts.toml", visible_alias = "r")]
     Run {
-        #[arg(value_name = "SCRIPT_NAME", action = ArgAction::Set)]
-        script: String,
+        #[arg(value_name = "SCRIPT_NAME")]
+        script: Option<String>,
         #[arg(short, long, value_name = "KEY=VALUE", action = ArgAction::Append)]
         env: Vec<String>,
         /// Preview what would be executed without actually running it
         #[arg(long)]
         dry_run: bool,
+        /// Suppress all output except errors
+        #[arg(short, long)]
+        quiet: bool,
+        /// Show detailed output
+        #[arg(short = 'v', long)]
+        verbose: bool,
+        /// Don't show performance metrics after execution
+        #[arg(long)]
+        no_metrics: bool,
+        /// Interactive script selection
+        #[arg(short, long)]
+        interactive: bool,
     },
     #[command(about = "Initialize a Scripts.toml file in the current directory")]
     Init,
     #[command(about = "Show all script names and descriptions defined in Scripts.toml")]
-    Show,
+    Show {
+        /// Suppress all output except errors
+        #[arg(short, long)]
+        quiet: bool,
+        /// Show detailed output
+        #[arg(short = 'v', long)]
+        verbose: bool,
+        /// Filter scripts by name or description
+        #[arg(short, long, value_name = "PATTERN")]
+        filter: Option<String>,
+    },
     #[command(about = "Generate shell completion scripts")]
     Completions {
         /// Shell to generate completions for
@@ -28,7 +50,14 @@ pub enum Commands {
         shell: Shell,
     },
     #[command(about = "Validate Scripts.toml syntax, script references, and tool requirements")]
-    Validate,
+    Validate {
+        /// Suppress all output except errors
+        #[arg(short, long)]
+        quiet: bool,
+        /// Show detailed output
+        #[arg(short = 'v', long)]
+        verbose: bool,
+    },
 }
 
 /// Supported shells for completion generation

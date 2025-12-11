@@ -21,8 +21,9 @@
 
 -   ✅ **Zero runtime dependencies** — Single binary, fast startup
 -   ✅ **Cross-platform** — Works on Windows, macOS, and Linux
--   ✅ **Modern CLI UX** — Shell completions, dry-run mode, helpful errors
+-   ✅ **Modern CLI UX** — Simplified syntax, interactive selection, shell completions
 -   ✅ **Powerful features** — Script chaining, environment variables, toolchain support
+-   ✅ **Developer-friendly** — Verbosity control, optional metrics, script filtering
 -   ✅ **CI/CD ready** — Validation command catches errors early
 -   ✅ **Rust-native** — Built with Rust, for Rust projects
 
@@ -63,32 +64,43 @@ After installation, you'll have multiple ways to invoke the tool:
     cgs init
     ```
 
-2. **Run** a script:
+2. **Run** a script (simplified syntax!):
 
     ```sh
-    # Using Cargo subcommand
+    # Direct script execution (new!)
+    cargo script build
+
+    # Explicit form (still works)
     cargo script run build
 
     # Or using direct binary
-    cgs run build
+    cgs build
     ```
 
-3. **Preview** what would run (dry-run):
+3. **Discover** scripts interactively:
 
     ```sh
-    cargo script run build --dry-run
+    # Interactive fuzzy selection
+    cargo script --interactive
+    cargo script -i
+
+    # Show all scripts
+    cargo script show
+
+    # Filter scripts
+    cargo script show --filter test
     ```
 
-4. **Validate** your configuration:
+4. **Preview** what would run (dry-run):
+
+    ```sh
+    cargo script build --dry-run
+    ```
+
+5. **Validate** your configuration:
 
     ```sh
     cargo script validate
-    ```
-
-5. **Show** all available scripts:
-
-    ```sh
-    cargo script show
     ```
 
 That's it! You're ready to go. 🎉
@@ -108,11 +120,16 @@ That's it! You're ready to go. 🎉
 
 ### Developer Experience
 
+-   **Simplified Syntax** — Run scripts directly: `cargo script build` (no `run` needed!)
+-   **Interactive Selection** — Fuzzy-find scripts with `--interactive` flag
+-   **Script Filtering** — Filter scripts by name or description
 -   **Shell Completions** — Tab completion for bash, zsh, fish, and PowerShell
 -   **Dry-Run Mode** — Preview execution without side effects
--   **Helpful Errors** — Actionable error messages with suggestions
+-   **Verbosity Control** — `--quiet` and `--verbose` flags for output control
+-   **Optional Metrics** — `--no-metrics` to suppress performance output
+-   **Helpful Errors** — Actionable error messages with quick-fix suggestions
 -   **Validation** — Catch configuration errors early
--   **Performance Metrics** — Track script execution times
+-   **Performance Metrics** — Track script execution times (optional)
 
 ## 📖 Usage Guide
 
@@ -144,17 +161,27 @@ doc = "cargo doc --no-deps --open"
 ### Run Scripts
 
 ```sh
-# Using Cargo subcommand (recommended)
+# Simplified syntax - run directly (new!)
+cargo script build
+cargo script test
+
+# Explicit form (still works)
 cargo script run build
 
-# Simple script
-cgs run build
+# With flags (works with both forms)
+cargo script build --env RUST_LOG=debug
+cargo script test --dry-run
+cargo script build --no-metrics
 
-# With environment variable override
-cargo script run test --env RUST_LOG=debug
+# Interactive selection
+cargo script --interactive
+cargo script -i
 
-# Preview execution (dry-run)
-cargo script run release --dry-run
+# Quiet mode (minimal output)
+cargo script build --quiet
+
+# Verbose mode (detailed output)
+cargo script build --verbose
 ```
 
 ### Script Configuration
@@ -269,21 +296,38 @@ cgs run test --env RUST_LOG=trace
 ### Show All Scripts
 
 ```sh
-# Using Cargo subcommand (recommended)
+# Show all scripts
 cargo script show
 
-# Or using direct binary
-cgs show
+# Filter scripts by name or description (new!)
+cargo script show --filter test
+cargo script show -f build
+
+# Default behavior - show scripts when no command provided
+cargo script
 ```
 
 Output:
 
 ```
-📋 Available Scripts:
-  • build     - Build the project
-  • test      - Run tests
-  • release   - Build release version
-  • prepublish - Run all prepublish checks
+Script   Description                           
+-------- --------------------------------------
+build    Build the project                     
+test     Run tests                             
+release  Build release version                
+```
+
+With filter:
+
+```sh
+$ cargo script show --filter test
+
+Found 2 script(s) matching 'test':
+
+Script   Description                           
+-------- --------------------------------------
+test     Run tests                             
+test-all Run all test suites                   
 ```
 
 ### Dry-Run Mode
@@ -291,12 +335,30 @@ Output:
 Preview what would be executed without actually running it:
 
 ```sh
-# Using Cargo subcommand (recommended)
-cargo script run prepublish --dry-run
+# Simplified syntax
+cargo script prepublish --dry-run
 
-# Or using direct binary
-cgs run prepublish --dry-run
+# Explicit form
+cargo script run prepublish --dry-run
 ```
+
+### Interactive Script Selection
+
+Use fuzzy selection to find and run scripts interactively:
+
+```sh
+# Interactive mode
+cargo script --interactive
+cargo script -i
+
+# Or via run command
+cargo script run --interactive
+```
+
+This opens an interactive fuzzy finder where you can:
+- Type to search scripts
+- See script descriptions
+- Select and run scripts easily
 
 **Output:**
 
@@ -422,7 +484,7 @@ cgs validate
 **Script Not Found:**
 
 ```bash
-$ cargo script run buid
+$ cargo script buid
 ❌ Script not found
 
 Error:
@@ -431,14 +493,15 @@ Error:
 Did you mean:
   • build
 
-Suggestion:
-  Use 'cargo script show' to see all available scripts
+Quick fix:
+  Run 'cargo script show' to see all available scripts
+  Or use 'cargo script init' to initialize Scripts.toml if it doesn't exist
 ```
 
 **Invalid TOML:**
 
 ```bash
-$ cargo script run test
+$ cargo script test
 ❌ Invalid TOML syntax
 
 Error:
@@ -446,11 +509,12 @@ Error:
   Message: invalid table header
   Line 10: See error details above
 
-Suggestion:
+Quick fix:
   Check your Scripts.toml syntax. Common issues:
   - Missing quotes around strings
   - Trailing commas in arrays
   - Invalid table syntax
+  Validate your file with: cargo script validate
 ```
 
 **Missing Tool:**
@@ -545,7 +609,17 @@ cgs run build --scripts-path ./config/scripts.toml
 
 ### Performance Metrics
 
-Script execution times are automatically tracked and displayed:
+Script execution times are automatically tracked and displayed (can be disabled):
+
+```sh
+# Show metrics (default)
+cargo script build
+
+# Hide metrics
+cargo script build --no-metrics
+```
+
+Output:
 
 ```
 Scripts Performance
@@ -557,9 +631,47 @@ Scripts Performance
 🕒 Total running time: 6.78s
 ```
 
+### Verbosity Control
+
+Control output verbosity with `--quiet` and `--verbose` flags:
+
+```sh
+# Quiet mode - minimal output
+cargo script build --quiet
+
+# Verbose mode - detailed output
+cargo script build --verbose
+
+# Normal mode (default)
+cargo script build
+```
+
+## 🚀 Recent Improvements
+
+### Phase 1: Simplified CLI (v0.5.1+)
+- ✅ **Direct script execution** - `cargo script build` (no `run` needed!)
+- ✅ **Default to show** - Running `cargo script` shows all scripts
+- ✅ **Verbosity flags** - `--quiet` and `--verbose` for output control
+- ✅ **Improved help text** - Better examples and formatting
+
+### Phase 2: Polish & UX (v0.5.1+)
+- ✅ **Conditional banner** - Only shows when needed (first run, verbose mode)
+- ✅ **Optional metrics** - `--no-metrics` flag to suppress performance output
+- ✅ **Better error messages** - Quick-fix suggestions with actionable commands
+- ✅ **Enhanced dry-run** - Better formatting and readability
+
+### Phase 3: Advanced Features (v0.5.1+)
+- ✅ **Interactive selection** - Fuzzy-find scripts with `--interactive` flag
+- ✅ **Script filtering** - Filter scripts by name/description with `--filter`
+- ✅ **Enhanced show command** - Better discovery and search capabilities
+
+See [ROADMAP.md](ROADMAP.md) for future planned features.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+See [ROADMAP.md](ROADMAP.md) for ideas on what to work on next.
 
 ## 📄 License
 

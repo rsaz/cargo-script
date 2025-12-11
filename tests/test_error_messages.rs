@@ -86,7 +86,7 @@ invalid = { command = "test", }
         .assert()
         .failure()
         .stderr(contains("Invalid TOML"))
-        .stderr(contains("Suggestion"));
+        .stderr(contains("Quick fix"));
     
     cleanup_scripts_toml(&test_file);
 }
@@ -99,7 +99,7 @@ fn test_missing_script_file() {
         .assert()
         .failure()
         .stderr(contains("Script file not found"))
-        .stderr(contains("Suggestion"));
+        .stderr(contains("Quick fix"));
 }
 
 /// Tests that script not found suggests similar names (fuzzy matching)

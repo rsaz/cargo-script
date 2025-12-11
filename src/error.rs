@@ -49,13 +49,14 @@ impl fmt::Display for CargoScriptError {
             CargoScriptError::ScriptFileNotFound { path, source } => {
                 write!(
                     f,
-                    "{}\n\n{}\n  {}\n  {}\n\n{}\n  {}",
+                    "{}\n\n{}\n  {}\n  {}\n\n{}\n  {}\n  {}",
                     "❌ Script file not found".red().bold(),
                     "Error:".yellow().bold(),
                     format!("Path: {}", path).white(),
                     format!("Reason: {}", source).white(),
-                    "Suggestion:".yellow().bold(),
-                    format!("Make sure '{}' exists in the current directory, or use --scripts-path to specify a different file.", path).white()
+                    "Quick fix:".yellow().bold(),
+                    format!("Run '{}' to create Scripts.toml in the current directory", "cargo script init".green()).white(),
+                    format!("Or use '{}' to specify a different file path", "--scripts-path <path>".green()).white()
                 )
             }
             CargoScriptError::InvalidToml { path, message, line } => {
@@ -66,15 +67,16 @@ impl fmt::Display for CargoScriptError {
                 };
                 write!(
                     f,
-                    "{}\n\n{}\n  {}\n  {}{}\n\n{}\n  {}\n  {}",
+                    "{}\n\n{}\n  {}\n  {}{}\n\n{}\n  {}\n  {}\n  {}",
                     "❌ Invalid TOML syntax".red().bold(),
                     "Error:".yellow().bold(),
                     format!("File: {}", path).white(),
                     format!("Message: {}", message).white(),
                     line_info,
-                    "Suggestion:".yellow().bold(),
+                    "Quick fix:".yellow().bold(),
                     "Check your Scripts.toml syntax. Common issues:".white(),
-                    "  - Missing quotes around strings\n  - Trailing commas in arrays\n  - Invalid table syntax".white()
+                    "  - Missing quotes around strings\n  - Trailing commas in arrays\n  - Invalid table syntax".white(),
+                    format!("Validate your file with: {}", "cargo script validate".green()).white()
                 )
             }
             CargoScriptError::ScriptNotFound {
@@ -109,13 +111,14 @@ impl fmt::Display for CargoScriptError {
 
                 write!(
                     f,
-                    "{}\n\n{}\n  {}{}\n\n{}\n  {}",
+                    "{}\n\n{}\n  {}{}\n\n{}\n  {}\n  {}",
                     "❌ Script not found".red().bold(),
                     "Error:".yellow().bold(),
                     format!("Script '{}' not found in Scripts.toml", script_name.bold()).white(),
                     suggestion_text,
-                    "Suggestion:".yellow().bold(),
-                    format!("Use '{}' to see all available scripts", "cgs show".green()).white()
+                    "Quick fix:".yellow().bold(),
+                    format!("Run '{}' to see all available scripts", "cargo script show".green()).white(),
+                    format!("Or use '{}' to initialize Scripts.toml if it doesn't exist", "cargo script init".green()).white()
                 )
             }
             CargoScriptError::ToolNotFound {
