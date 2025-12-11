@@ -64,13 +64,13 @@ After installation, you'll have multiple ways to invoke the tool:
     cgs init
     ```
 
-2. **Run** a script (simplified syntax!):
+2. **Run** a script:
 
     ```sh
-    # Direct script execution (new!)
+    # Direct script execution
     cargo script build
 
-    # Explicit form (still works)
+    # Explicit form
     cargo script run build
 
     # Or using direct binary
@@ -120,7 +120,7 @@ That's it! You're ready to go. 🎉
 
 ### Developer Experience
 
--   **Simplified Syntax** — Run scripts directly: `cargo script build` (no `run` needed!)
+-   **Simplified Syntax** — Run scripts directly: `cargo script build`
 -   **Interactive Selection** — Fuzzy-find scripts with `--interactive` flag
 -   **Script Filtering** — Filter scripts by name or description
 -   **Shell Completions** — Tab completion for bash, zsh, fish, and PowerShell
@@ -161,14 +161,14 @@ doc = "cargo doc --no-deps --open"
 ### Run Scripts
 
 ```sh
-# Simplified syntax - run directly (new!)
+# Direct script execution
 cargo script build
 cargo script test
 
-# Explicit form (still works)
+# Explicit form
 cargo script run build
 
-# With flags (works with both forms)
+# With flags
 cargo script build --env RUST_LOG=debug
 cargo script test --dry-run
 cargo script build --no-metrics
@@ -299,7 +299,7 @@ cgs run test --env RUST_LOG=trace
 # Show all scripts
 cargo script show
 
-# Filter scripts by name or description (new!)
+# Filter scripts by name or description
 cargo script show --filter test
 cargo script show -f build
 
@@ -646,32 +646,9 @@ cargo script build --verbose
 cargo script build
 ```
 
-## 🚀 Recent Improvements
-
-### Phase 1: Simplified CLI (v0.5.1+)
-- ✅ **Direct script execution** - `cargo script build` (no `run` needed!)
-- ✅ **Default to show** - Running `cargo script` shows all scripts
-- ✅ **Verbosity flags** - `--quiet` and `--verbose` for output control
-- ✅ **Improved help text** - Better examples and formatting
-
-### Phase 2: Polish & UX (v0.5.1+)
-- ✅ **Conditional banner** - Only shows when needed (first run, verbose mode)
-- ✅ **Optional metrics** - `--no-metrics` flag to suppress performance output
-- ✅ **Better error messages** - Quick-fix suggestions with actionable commands
-- ✅ **Enhanced dry-run** - Better formatting and readability
-
-### Phase 3: Advanced Features (v0.5.1+)
-- ✅ **Interactive selection** - Fuzzy-find scripts with `--interactive` flag
-- ✅ **Script filtering** - Filter scripts by name/description with `--filter`
-- ✅ **Enhanced show command** - Better discovery and search capabilities
-
-See [ROADMAP.md](ROADMAP.md) for future planned features.
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-See [ROADMAP.md](ROADMAP.md) for ideas on what to work on next.
 
 ## 📄 License
 
