@@ -1,66 +1,45 @@
 use assert_cmd::cargo::cargo_bin_cmd;
 use std::fs;
-#[cfg(not(target_os = "windows"))]
-use std::process::Command as ProcessCommand;
+use std::sync::Mutex;
 
 mod constants;
 use constants::SCRIPT_TOML;
 
-/// Sets up the test scripts by creating a directory and a test script file,
-/// and making the script executable.
-/// Uses a unique filename to avoid conflicts when tests run in parallel.
+/// Sets up `.scripts/test_script.sh` so the bash-interpreter tests can execute it.
+///
+/// This used to remove and re-create the file on every call, then shell out to
+/// `chmod +x`. That approach raced badly under `cargo test`'s parallel runner on
+/// Linux: when one test was mid-`cmd.assert()` and another test re-entered this
+/// helper, `fs::write` would recreate the file with the default umask (`0o644`)
+/// because `OpenOptions` only applies the mode on creation. Between that write
+/// and the subsequent `chmod`, the in-flight `bash` would observe a non-
+/// executable file and exit with status 126 (`Permission denied`).
+///
+/// The new implementation is idempotent and serialised:
+///   * a process-wide `Mutex` orders concurrent setups within this test binary;
+///   * the file is only rewritten when its contents differ, so we never demote a
+///     valid file to `0o644`;
+///   * permissions are set via `fs::set_permissions` (no subprocess).
 fn setup_test_scripts() {
-    use std::path::Path;
-    use std::thread;
-    use std::time::Duration;
-    
-    let script_content = r#"
-#!/usr/bin/env bash
-echo "Test script executed"
-    "#;
+    static SETUP_LOCK: Mutex<()> = Mutex::new(());
+    let _guard = SETUP_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+
+    let script_content = "#!/usr/bin/env bash\necho \"Test script executed\"\n";
     fs::create_dir_all(".scripts").unwrap();
-    
     let script_path = ".scripts/test_script.sh";
-    
-    // Remove existing file if it exists, with retry logic for "Text file busy" errors
-    // This handles the case where another test is still executing the script
-    // Error code 26 (ETXTBSY) means "Text file busy" on Linux
-    if Path::new(script_path).exists() {
-        let mut retries = 10;
-        while retries > 0 {
-            match fs::remove_file(script_path) {
-                Ok(_) => break,
-                Err(e) => {
-                    // Check for "Text file busy" error (code 26 on Linux)
-                    // This can happen when the script is being executed by another test
-                    let is_busy = e.raw_os_error() == Some(26) || 
-                                  e.kind() == std::io::ErrorKind::PermissionDenied ||
-                                  e.to_string().contains("busy") ||
-                                  e.to_string().contains("Text file busy");
-                    
-                    if is_busy && retries > 1 {
-                        // File is busy, wait and retry
-                        retries -= 1;
-                        thread::sleep(Duration::from_millis(50));
-                    } else {
-                        // Give up after retries or if it's a different error
-                        break;
-                    }
-                }
-            }
-        }
+
+    let needs_write = match fs::read_to_string(script_path) {
+        Ok(existing) => existing != script_content,
+        Err(_) => true,
+    };
+    if needs_write {
+        fs::write(script_path, script_content).unwrap();
     }
-    
-    // Write the script file
-    fs::write(script_path, script_content).unwrap();
-    
-    // On Windows, chmod doesn't exist and files don't need to be made executable
+
     #[cfg(not(target_os = "windows"))]
     {
-        ProcessCommand::new("chmod")
-            .args(&["+x", script_path])
-            .status()
-            .expect("Failed to make test script executable");
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(script_path, fs::Permissions::from_mode(0o755));
     }
 }
 
