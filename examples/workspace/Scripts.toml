@@ -1,0 +1,16 @@
+[global_env]
+RUST_BACKTRACE = "1"
+
+[scripts]
+# Run cargo test once per workspace member, sequentially.
+test-all      = { command = "cargo test", workspace = "all", info = "Test every member" }
+
+# Same, but in parallel (uses tokio under the hood).
+test-parallel = { command = "cargo test", workspace = "parallel", info = "Test in parallel" }
+
+# Workspace-wide checks at the root.
+fmt-check     = "cargo fmt --all -- --check"
+lint          = "cargo clippy --workspace --all-targets -- -D warnings"
+
+# Composite CI pipeline: format-check + lint + parallel tests.
+ci = { include = ["fmt-check", "lint", "test-parallel"], info = "Full workspace CI" }

@@ -1,0 +1,10 @@
+[global_env]
+RUST_BACKTRACE = "1"
+
+[scripts]
+ci          = { include = ["fmt-check", "lint", "test", "build"], info = "Full CI pipeline" }
+fmt-check   = "cargo fmt --all -- --check"
+lint        = "cargo clippy --all-targets --all-features -- -D warnings"
+test        = "cargo test --all-features"
+build       = "cargo build --release"
+audit       = { command = "cargo audit", requires = ["cargo-audit"], info = "Security audit (needs cargo-audit)" }

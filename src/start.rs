@@ -1,19 +1,28 @@
-//! This module contains the main logic for the cargo-script CLI tool.
+//! Top-level CLI entry point for `cargo-script` / `cgs`.
 //!
-//! It parses the command-line arguments and executes the appropriate commands.
-use crate::commands::{init::init_script_file, script::run_script, Commands, script::Scripts, show::show_scripts, completions::generate_completions, validate::{validate_scripts, print_validation_results}};
-use crate::error::CargoScriptError;
-use std::fs;
-use clap::{Parser, CommandFactory, ArgAction};
-use colored::*;
+//! Parses arguments via clap, dispatches to the relevant command and centralises
+//! error reporting.
 
-/// Command-line arguments structure for the cargo-script CLI tool.
+use crate::commands::{
+    completions::generate_completions,
+    init::{init_from_template, init_script_file, list_templates},
+    script::{run_script_with_options, RunOptions, Scripts},
+    show::show_scripts,
+    validate::{print_validation_results, validate_scripts},
+    workspace as _workspace,
+    Commands, WorkspaceCmd,
+};
+use crate::error::CargoScriptError;
+use clap::{ArgAction, CommandFactory, Parser};
+use colored::*;
+use std::fs;
+
 #[derive(Parser, Debug)]
 #[command(
     name = "cargo-script",
     about = "A powerful CLI tool for managing project scripts in Rust",
-    long_about = "Think npm scripts, make, or just — but built specifically for the Rust ecosystem with modern CLI best practices.",
-    after_help = "EXAMPLES:\n  cargo script build                              Run the 'build' script\n  cargo script run test                          Explicitly run the 'test' script\n  cargo script test --env RUST_LOG=debug        Run with environment variable\n  cargo script test --dry-run                    Preview what would run\n  cargo script test --no-metrics                 Run without performance metrics\n  cargo script --interactive                     Interactive script selection\n  cargo script show                              List all available scripts\n  cargo script show --filter test                Filter scripts by name/description\n  cargo script init                              Initialize Scripts.toml\n  cargo script validate                         Validate Scripts.toml\n\nFor more information, visit: https://github.com/rsaz/cargo-script",
+    long_about = "Think npm scripts, make, or just — but built specifically for the Rust ecosystem with workspace support, cargo-script (.rs) integration, hooks, parallel execution, watch mode and CI/CD templates.",
+    after_help = "EXAMPLES:\n  cargo script build                              Run the 'build' script\n  cargo script run test                          Explicitly run the 'test' script\n  cargo script test --env RUST_LOG=debug        Run with environment variable\n  cargo script test --dry-run                    Preview what would run\n  cargo script test --watch                      Re-run on file changes\n  cargo script test --json                       Emit a JSON execution report\n  cargo script ci --workspace=parallel           Run 'ci' across workspace members\n  cargo script init --template github-actions    Scaffold CI/CD config\n  cargo script workspace list                    List workspace members\n  cargo script show                              List all available scripts\n  cargo script validate                          Validate Scripts.toml\n\nFor more information, visit: https://github.com/rsaz/cargo-script",
     version,
     subcommand_required = false,
     arg_required_else_help = false,
@@ -36,18 +45,19 @@ pub struct Cli {
     /// Environment variables to set (only used when script_name is provided)
     #[arg(short, long, value_name = "KEY=VALUE", action = ArgAction::Append, global = true)]
     env: Vec<String>,
-    /// Preview what would be executed without actually running it (only used when script_name is provided)
+    /// Preview what would be executed without actually running it
     #[arg(long, global = true)]
     dry_run: bool,
-    /// Don't show performance metrics after execution (only used when script_name is provided)
+    /// Don't show performance metrics after execution
     #[arg(long, global = true)]
     no_metrics: bool,
-    /// Interactive script selection (only used when script_name is provided)
+    /// Interactive script selection
     #[arg(short, long, global = true)]
     interactive: bool,
 }
 
-/// Run function that handles errors gracefully.
+/// Entry point used by `main.rs` / `cgs.rs`. Prints any error to stderr and
+/// exits with a non-zero status.
 pub fn run_with_error_handling() {
     if let Err(e) = run() {
         eprintln!("{}", e);
@@ -55,74 +65,54 @@ pub fn run_with_error_handling() {
     }
 }
 
-/// Run function that parses command-line arguments and executes the specified command.
-///
-/// This function initializes the CLI, parses the command-line arguments, and routes
-/// the commands to their respective handlers.
-///
-/// # Errors
-///
-/// Returns an error if it fails to read or parse the `Scripts.toml` file.
+/// Pure run function: parses CLI and dispatches to the relevant subcommand.
 pub fn run() -> Result<(), CargoScriptError> {
-    // Handle Cargo subcommand invocation
-    // When invoked as `cargo script`, Cargo passes "script" as the first argument
-    // We need to remove it before parsing
     let args: Vec<String> = std::env::args().collect();
     let cli = if args.len() > 1 && args[1] == "script" {
-        // Remove "script" argument when invoked as `cargo script`
-        // Also need to include the binary name for clap
-        let mut cargo_args = vec![args[0].clone()]; // binary name
-        cargo_args.extend(args.into_iter().skip(2)); // skip "cargo-script" and "script"
-        
-        // If no arguments after "script", default to show
+        // Invoked as `cargo script ...`
+        let mut cargo_args = vec![args[0].clone()];
+        cargo_args.extend(args.into_iter().skip(2));
+
         if cargo_args.len() == 1 {
-            // Only binary name, no subcommand - default to show
             return handle_show_command("Scripts.toml", false, false, None);
         }
-        
-        // Check for help flag before parsing
+
         if cargo_args.len() == 2 && (cargo_args[1] == "--help" || cargo_args[1] == "-h") {
             let mut app = Cli::command();
             app.print_help().unwrap();
             std::process::exit(0);
         }
-        
-        Cli::try_parse_from(cargo_args).unwrap_or_else(|e| {
-            // Let clap handle the error (will show usage)
-            e.exit()
-        })
+
+        Cli::try_parse_from(cargo_args).unwrap_or_else(|e| e.exit())
     } else {
-        // Normal invocation: `cargo-script` or `cgs`
         Cli::parse()
     };
-    
-    // Determine the actual command to execute
-    // If no command but script_name is provided, treat as Run
-    // If no command and no script_name, default to Show
-    // Error if both command and script_name are provided
+
     let command = match (&cli.command, &cli.script_name) {
-        (Some(_cmd), Some(_)) => {
-            // Both command and script_name provided - this is an error
+        (Some(_), Some(_)) => {
             eprintln!("{}", "Error: Cannot specify both a subcommand and a script name".red().bold());
             eprintln!("{}", "Use either 'cargo script <script_name>' or 'cargo script <subcommand>'".white());
             std::process::exit(1);
         }
         (Some(cmd), None) => cmd.clone(),
-        (None, Some(script_name)) => {
-            // Treat script_name as Run command, using global flags
-            Commands::Run {
-                script: Some(script_name.clone()),
-                env: cli.env.clone(),
-                dry_run: cli.dry_run,
-                quiet: false, // Use global quiet flag instead
-                verbose: false, // Use global verbose flag instead
-                no_metrics: cli.no_metrics,
-                interactive: cli.interactive,
-            }
-        }
+        (None, Some(script_name)) => Commands::Run {
+            script: Some(script_name.clone()),
+            env: cli.env.clone(),
+            dry_run: cli.dry_run,
+            quiet: false,
+            verbose: false,
+            no_metrics: cli.no_metrics,
+            interactive: cli.interactive,
+            workspace: None,
+            no_workspace: false,
+            watch: false,
+            watch_path: vec![],
+            watch_exclude: vec![],
+            json: false,
+            parallel: vec![],
+            script_args: vec![],
+        },
         (None, None) => {
-            // If --interactive is set, treat as Run with interactive mode
-            // Otherwise default to Show
             if cli.interactive {
                 Commands::Run {
                     script: None,
@@ -132,6 +122,14 @@ pub fn run() -> Result<(), CargoScriptError> {
                     verbose: false,
                     no_metrics: cli.no_metrics,
                     interactive: true,
+                    workspace: None,
+                    no_workspace: false,
+                    watch: false,
+                    watch_path: vec![],
+                    watch_exclude: vec![],
+                    json: false,
+                    parallel: vec![],
+                    script_args: vec![],
                 }
             } else {
                 Commands::Show {
@@ -142,58 +140,84 @@ pub fn run() -> Result<(), CargoScriptError> {
             }
         }
     };
-    
-    // Conditional banner display:
-    // - Never show for completions (interferes with output)
-    // - Never show in quiet mode
-    // - Show in verbose mode
-    // - Show if Scripts.toml doesn't exist (first run)
-    // - Don't show for dry-run (cleaner output)
-    // - Show for Init, Show, and Validate commands (helpful context)
-    let should_show_banner = !cli.quiet 
+
+    let should_show_banner = !cli.quiet
         && !matches!(&command, Commands::Completions { .. })
         && !matches!(&command, Commands::Run { dry_run: true, .. })
-        && (cli.verbose 
+        && !matches!(&command, Commands::Run { json: true, .. })
+        && (cli.verbose
             || !std::path::Path::new(&cli.scripts_path).exists()
-            || matches!(&command, Commands::Init | Commands::Show { .. } | Commands::Validate { .. }));
-    
+            || matches!(
+                &command,
+                Commands::Init { .. } | Commands::Show { .. } | Commands::Validate { .. } | Commands::Workspace { .. }
+            ));
+
     if should_show_banner {
-        let init_msg = format!("A CLI tool to run custom scripts in Rust, defined in [ Scripts.toml ] {}", emoji::objects::computer::FLOPPY_DISK.glyph);
+        let init_msg = format!(
+            "A CLI tool to run custom scripts in Rust, defined in [ Scripts.toml ] {}",
+            emoji::objects::computer::FLOPPY_DISK.glyph
+        );
         print_framed_message(&init_msg);
     }
-    
+
     let scripts_path = &cli.scripts_path;
 
     match &command {
-        Commands::Run { script, env, dry_run, quiet, verbose, no_metrics, interactive } => {
-            // Merge global and command-specific flags
-            // When Run is explicitly used, its flags take precedence
-            // When script_name is used (short form), global flags are used
+        Commands::Run {
+            script,
+            env,
+            dry_run,
+            quiet,
+            verbose,
+            no_metrics,
+            interactive,
+            workspace,
+            no_workspace,
+            watch,
+            watch_path,
+            watch_exclude,
+            json,
+            parallel,
+            script_args,
+        } => {
             let final_quiet = cli.quiet || *quiet;
             let final_verbose = cli.verbose || *verbose;
             let final_dry_run = cli.dry_run || *dry_run;
             let final_no_metrics = cli.no_metrics || *no_metrics;
             let final_env = if !env.is_empty() { env.clone() } else { cli.env.clone() };
-            let show_metrics = !final_no_metrics; // Show metrics by default unless --no-metrics is set
-            
-            let scripts_content = fs::read_to_string(scripts_path)
-                .map_err(|e| CargoScriptError::ScriptFileNotFound {
-                    path: scripts_path.clone(),
-                    source: e,
-                })?;
-            
-            let scripts: Scripts = toml::from_str(&scripts_content)
-                .map_err(|e| {
-                    let message = e.message().to_string();
-                    let line = e.span().map(|s| s.start);
-                    CargoScriptError::InvalidToml {
-                        path: scripts_path.clone(),
-                        message,
-                        line,
+
+            let scripts = load_scripts(scripts_path)?;
+
+            // Multi-script parallel mode: --parallel A --parallel B [...] [primary]
+            if !parallel.is_empty() {
+                #[cfg(feature = "parallel")]
+                {
+                    let mut names = parallel.clone();
+                    if let Some(s) = script.clone() {
+                        names.insert(0, s);
                     }
-                })?;
-            
-            // Handle interactive mode or when script is not provided
+                    let opts = RunOptions {
+                        env_overrides: final_env,
+                        dry_run: final_dry_run,
+                        quiet: final_quiet,
+                        verbose: final_verbose,
+                        show_metrics: !final_no_metrics,
+                        json_output: *json,
+                        ..RunOptions::default()
+                    };
+                    let result = crate::commands::parallel::run_scripts_parallel(&scripts, &names, &opts)?;
+                    if *json {
+                        crate::output::json::print_execution_result(&result);
+                    }
+                    return Ok(());
+                }
+                #[cfg(not(feature = "parallel"))]
+                {
+                    eprintln!("--parallel requires the `parallel` feature");
+                    std::process::exit(2);
+                }
+            }
+
             let script_name = if *interactive || script.is_none() {
                 crate::commands::script::interactive_select_script(&scripts, final_quiet)?
             } else {
@@ -202,14 +226,57 @@ pub fn run() -> Result<(), CargoScriptError> {
                     available_scripts: scripts.scripts.keys().cloned().collect(),
                 })?
             };
-            
-            run_script(&scripts, &script_name, final_env, final_dry_run, final_quiet, final_verbose, show_metrics)?;
+
+            let opts = RunOptions {
+                env_overrides: final_env,
+                dry_run: final_dry_run,
+                quiet: final_quiet,
+                verbose: final_verbose,
+                show_metrics: !final_no_metrics,
+                script_args: script_args.clone(),
+                workspace_override: workspace.map(Into::into),
+                no_workspace: *no_workspace,
+                json_output: *json,
+            };
+
+            if *watch {
+                #[cfg(feature = "watch")]
+                {
+                    let cfg = crate::commands::watch::WatchConfig {
+                        watch_paths: if watch_path.is_empty() {
+                            vec![std::path::PathBuf::from(".")]
+                        } else {
+                            watch_path.clone()
+                        },
+                        exclude: {
+                            let mut v = vec!["target".to_string(), ".git".to_string(), "node_modules".to_string()];
+                            v.extend(watch_exclude.clone());
+                            v
+                        },
+                        ..crate::commands::watch::WatchConfig::default()
+                    };
+                    return crate::commands::watch::watch_and_run(&scripts, &script_name, &opts, cfg);
+                }
+                #[cfg(not(feature = "watch"))]
+                {
+                    let _ = (watch_path, watch_exclude);
+                    eprintln!("--watch requires the `watch` feature");
+                    std::process::exit(2);
+                }
+            }
+
+            let _ = run_script_with_options(&scripts, &script_name, &opts)?;
         }
-        Commands::Init => {
-            init_script_file(Some(scripts_path));
+        Commands::Init { template, list_templates: list_flag, force } => {
+            if *list_flag {
+                list_templates();
+            } else if let Some(t) = template {
+                init_from_template(t, *force)?;
+            } else {
+                init_script_file(Some(scripts_path));
+            }
         }
         Commands::Show { quiet, verbose: _verbose, filter } => {
-            // Merge global and command-specific verbosity flags
             let final_quiet = cli.quiet || *quiet;
             handle_show_command(scripts_path, final_quiet, cli.verbose, filter.as_deref())?;
         }
@@ -218,77 +285,84 @@ pub fn run() -> Result<(), CargoScriptError> {
             generate_completions(shell.clone(), &mut app);
         }
         Commands::Validate { quiet, verbose: _verbose } => {
-            // Merge global and command-specific verbosity flags
             let final_quiet = cli.quiet || *quiet;
-            
-            let scripts_content = fs::read_to_string(scripts_path)
-                .map_err(|e| CargoScriptError::ScriptFileNotFound {
-                    path: scripts_path.clone(),
-                    source: e,
-                })?;
-            
-            let scripts: Scripts = toml::from_str(&scripts_content)
-                .map_err(|e| {
-                    let message = e.message().to_string();
-                    let line = e.span().map(|s| s.start);
-                    CargoScriptError::InvalidToml {
-                        path: scripts_path.clone(),
-                        message,
-                        line,
-                    }
-                })?;
-            
+            let scripts = load_scripts(scripts_path)?;
             let validation_result = validate_scripts(&scripts);
             if !final_quiet {
                 print_validation_results(&validation_result);
             }
-            
             if !validation_result.is_valid() {
                 std::process::exit(1);
             }
         }
+        Commands::Workspace { cmd } => match cmd {
+            WorkspaceCmd::List { json } => {
+                let scripts = load_scripts(scripts_path).unwrap_or_default();
+                let summary = _workspace::workspace_summary(&scripts)?;
+                if *json {
+                    println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+                } else {
+                    println!("{}", "📦 Workspace members".cyan().bold());
+                    if let Some(members) = summary.get("members") {
+                        for m in members {
+                            println!("  • {}", m.green());
+                        }
+                    }
+                }
+            }
+            WorkspaceCmd::Run { script, parallel: par, json } => {
+                let scripts = load_scripts(scripts_path)?;
+                let mode = if *par {
+                    crate::commands::script::WorkspaceMode::Parallel
+                } else {
+                    crate::commands::script::WorkspaceMode::All
+                };
+                let opts = RunOptions {
+                    env_overrides: cli.env.clone(),
+                    quiet: cli.quiet,
+                    verbose: cli.verbose,
+                    show_metrics: !cli.no_metrics,
+                    workspace_override: Some(mode),
+                    json_output: *json,
+                    ..RunOptions::default()
+                };
+                let _ = run_script_with_options(&scripts, script, &opts)?;
+            }
+        },
     }
-    
+
     Ok(())
 }
 
-/// Helper function to handle the Show command
-fn handle_show_command(scripts_path: &str, quiet: bool, _verbose: bool, filter: Option<&str>) -> Result<(), CargoScriptError> {
-    let scripts_content = fs::read_to_string(scripts_path)
-        .map_err(|e| CargoScriptError::ScriptFileNotFound {
+fn load_scripts(scripts_path: &str) -> Result<Scripts, CargoScriptError> {
+    let scripts_content = fs::read_to_string(scripts_path).map_err(|e| {
+        CargoScriptError::ScriptFileNotFound {
             path: scripts_path.to_string(),
             source: e,
-        })?;
-    
-    let scripts: Scripts = toml::from_str(&scripts_content)
-        .map_err(|e| {
-            let message = e.message().to_string();
-            let line = e.span().map(|s| s.start);
-            CargoScriptError::InvalidToml {
-                path: scripts_path.to_string(),
-                message,
-                line,
-            }
-        })?;
-    
+        }
+    })?;
+
+    toml::from_str(&scripts_content).map_err(|e| {
+        let message = e.message().to_string();
+        let line = e.span().map(|s| s.start);
+        CargoScriptError::InvalidToml {
+            path: scripts_path.to_string(),
+            message,
+            line,
+        }
+    })
+}
+
+fn handle_show_command(scripts_path: &str, quiet: bool, _verbose: bool, filter: Option<&str>) -> Result<(), CargoScriptError> {
+    let scripts = load_scripts(scripts_path)?;
     if !quiet {
         show_scripts(&scripts, filter);
     }
-    
     Ok(())
 }
 
-/// Prints a framed message with a dashed line frame.
-///
-/// This function prints a framed message to the console, making it more visually
-/// appealing and easier to read.
-///
-/// # Arguments
-///
-/// * `message` - A string slice that holds the message to be framed.
-///
 fn print_framed_message(message: &str) {
     let framed_message = format!("| {} |", message);
-    let frame = "-".repeat(framed_message.len()-2);
+    let frame = "-".repeat(framed_message.len() - 2);
     println!("\n{}\n{}\n{}\n", frame.yellow(), framed_message.yellow(), frame.yellow());
 }

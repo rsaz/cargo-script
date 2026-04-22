@@ -12,31 +12,53 @@
 
 <!-- prettier-ignore-end -->
 
-> **A powerful, fast, and developer-friendly CLI tool for managing project scripts in Rust**  
-> Think `npm scripts`, `make`, or `just` — but built specifically for the Rust ecosystem with modern CLI best practices.
+> **A powerful, fast, and developer-friendly CLI tool for managing project scripts in Rust.**  
+> Think `npm scripts`, `make`, or `just` — but built specifically for the Rust ecosystem, **workspace-aware**, and ready for the upcoming `cargo-script` (RFC 3502) era.
+
+## What's new in 0.6
+
+- **Workspace orchestration** — `workspace = "all" | "parallel"` runs a script across every member crate. CLI override: `--workspace=parallel` ([guide](docs/WORKSPACE_GUIDE.md))
+- **Cargo-script (RFC 3502) integration** — invoke `.rs` single-file packages directly from `Scripts.toml`. Stable + nightly auto-detected. ([guide](docs/CARGO_SCRIPT_INTEGRATION.md))
+- **CI/CD templates** — `cargo script init --template github-actions` scaffolds `Scripts.toml` + the matching workflow. ([guide](docs/CI_CD_GUIDE.md))
+- **Lifecycle hooks** — `pre`, `post`, `on_success`, `on_failure` per script.
+- **Parallel execution** — `--parallel` and `workspace = "parallel"` (Tokio).
+- **Watch mode** — `cargo script test --watch` re-runs on file changes.
+- **Parameters** — `args`, `defaults`, `{{name}}` substitution.
+- **JSON output** — `--json` for pipeline-friendly results.
+
+See [`docs/ADVANCED_FEATURES.md`](docs/ADVANCED_FEATURES.md) for the full reference and [`examples/`](examples/) for runnable demos.
 
 ## Why `cargo-run`?
 
 **Stop writing one-off shell scripts.** `cargo-run` provides a unified, type-safe way to manage all your project automation:
 
--   ✅ **Zero runtime dependencies** — Single binary, fast startup
--   ✅ **Cross-platform** — Works on Windows, macOS, and Linux
--   ✅ **Modern CLI UX** — Simplified syntax, interactive selection, shell completions
--   ✅ **Powerful features** — Script chaining, environment variables, toolchain support
--   ✅ **Developer-friendly** — Verbosity control, optional metrics, script filtering
--   ✅ **CI/CD ready** — Validation command catches errors early
--   ✅ **Rust-native** — Built with Rust, for Rust projects
+- ✅ **Workspace-aware** — Run scripts across every member, sequentially or in parallel
+- ✅ **Cargo-script ready** — First-class RFC 3502 (`.rs`) script support
+- ✅ **Zero runtime dependencies** — Single binary, fast startup
+- ✅ **Cross-platform** — Works on Windows, macOS, and Linux
+- ✅ **Modern CLI UX** — Simplified syntax, interactive selection, shell completions
+- ✅ **Powerful features** — Script chaining, hooks, parallel/watch, parameters, env vars, toolchains
+- ✅ **CI/CD ready** — Templates, validation, JSON output
+- ✅ **Rust-native** — Built with Rust, for Rust projects
 
 ### Quick Comparison
 
-| Feature                | `cargo-run` | `make` | `just` | `npm scripts` |
-| ---------------------- | ----------- | ------ | ------ | ------------- |
-| Zero dependencies      | ✅          | ✅     | ✅     | ❌ (Node.js)  |
-| Shell completions      | ✅          | ⚠️     | ✅     | ✅            |
-| Dry-run mode           | ✅          | ❌     | ✅     | ❌            |
-| Validation             | ✅          | ❌     | ⚠️     | ❌            |
-| Toolchain support      | ✅          | ❌     | ❌     | ❌            |
-| Environment precedence | ✅          | ⚠️     | ⚠️     | ✅            |
+| Feature                     | `cargo-run` | `make` | `just` | `cargo-make` | `npm scripts` |
+| --------------------------- | ----------- | ------ | ------ | ------------ | ------------- |
+| Zero runtime dependencies   | ✅          | ✅     | ✅     | ✅           | ❌ (Node.js)  |
+| Cross-platform              | ✅          | ⚠️     | ✅     | ✅           | ✅            |
+| Workspace orchestration     | ✅          | ❌     | ❌     | ✅           | ❌            |
+| **Parallel execution**      | ✅          | ⚠️     | ❌     | ✅           | ⚠️            |
+| **Watch mode (built-in)**   | ✅          | ❌     | ❌     | ❌           | ❌            |
+| **Cargo-script (RFC 3502)** | ✅          | ❌     | ❌     | ❌           | ❌            |
+| **CI/CD templates**         | ✅          | ❌     | ❌     | ⚠️           | ❌            |
+| Lifecycle hooks             | ✅          | ❌     | ❌     | ✅           | ⚠️            |
+| Parameters / substitution   | ✅          | ⚠️     | ✅     | ✅           | ⚠️            |
+| JSON output                 | ✅          | ❌     | ⚠️     | ❌           | ❌            |
+| Shell completions           | ✅          | ⚠️     | ✅     | ✅           | ✅            |
+| Dry-run mode                | ✅          | ❌     | ✅     | ✅           | ❌            |
+| Validation                  | ✅          | ❌     | ⚠️     | ⚠️           | ❌            |
+| Toolchain support           | ✅          | ❌     | ❌     | ⚠️           | ❌            |
 
 ## 📦 Installation
 
@@ -46,9 +68,9 @@ cargo install cargo-run
 
 After installation, you'll have multiple ways to invoke the tool:
 
--   `cargo script` — **Recommended**: Use as a Cargo subcommand (e.g., `cargo script run build`)
--   `cargo-script` — Direct binary invocation
--   `cgs` — Short alias (used in examples below for brevity)
+- `cargo script` — **Recommended**: Use as a Cargo subcommand (e.g., `cargo script run build`)
+- `cargo-script` — Direct binary invocation
+- `cgs` — Short alias (used in examples below for brevity)
 
 **Note:** When installed via `cargo install`, the `cargo-script` binary is automatically available in your PATH, enabling `cargo script` subcommand usage.
 
@@ -111,25 +133,76 @@ That's it! You're ready to go. 🎉
 
 ### Core Features
 
--   **Script Execution** — Run scripts defined in `Scripts.toml`
--   **Script Chaining** — Compose complex workflows with `include`
--   **Environment Variables** — Global, script-specific, and command-line overrides
--   **Multiple Interpreters** — bash, zsh, PowerShell, cmd, or custom
--   **Toolchain Support** — Rust toolchains via rustup, Python versions
--   **Requirements Checking** — Validate tool versions before execution
+- **Script Execution** — Run scripts defined in `Scripts.toml`
+- **Script Chaining** — Compose complex workflows with `include`
+- **Environment Variables** — Global, script-specific, and command-line overrides
+- **Multiple Interpreters** — bash, zsh, PowerShell, cmd, or custom
+- **Toolchain Support** — Rust toolchains via rustup, Python versions
+- **Requirements Checking** — Validate tool versions before execution
+
+### v0.6 Highlights
+
+- **Workspace Mode** — `workspace = "all" \| "parallel"` per script ([guide](docs/WORKSPACE_GUIDE.md))
+- **Cargo Script Integration** — invoke `.rs` files (RFC 3502) ([guide](docs/CARGO_SCRIPT_INTEGRATION.md))
+- **CI/CD Templates** — `init --template github-actions \| gitlab-ci \| rust-project \| workspace` ([guide](docs/CI_CD_GUIDE.md))
+- **Lifecycle Hooks** — `pre`, `post`, `on_success`, `on_failure`
+- **Parallel Execution** — `--parallel <SCRIPT>` and workspace-parallel
+- **Watch Mode** — `--watch`, `--watch-path`, `--watch-exclude`
+- **Parameters** — `args`, `defaults`, `{{name}}` substitution
+- **JSON Output** — `--json` for machine-readable execution results
+- **Workspace Subcommand** — `cargo script workspace list / run`
 
 ### Developer Experience
 
--   **Simplified Syntax** — Run scripts directly: `cargo script build`
--   **Interactive Selection** — Fuzzy-find scripts with `--interactive` flag
--   **Script Filtering** — Filter scripts by name or description
--   **Shell Completions** — Tab completion for bash, zsh, fish, and PowerShell
--   **Dry-Run Mode** — Preview execution without side effects
--   **Verbosity Control** — `--quiet` and `--verbose` flags for output control
--   **Optional Metrics** — `--no-metrics` to suppress performance output
--   **Helpful Errors** — Actionable error messages with quick-fix suggestions
--   **Validation** — Catch configuration errors early
--   **Performance Metrics** — Track script execution times (optional)
+- **Simplified Syntax** — Run scripts directly: `cargo script build`
+- **Interactive Selection** — Fuzzy-find scripts with `--interactive` flag
+- **Script Filtering** — Filter scripts by name or description
+- **Shell Completions** — Tab completion for bash, zsh, fish, and PowerShell
+- **Dry-Run Mode** — Preview execution without side effects
+- **Verbosity Control** — `--quiet` and `--verbose` flags for output control
+- **Optional Metrics** — `--no-metrics` to suppress performance output
+- **Helpful Errors** — Actionable error messages with quick-fix suggestions
+- **Validation** — Catch configuration errors early
+- **Performance Metrics** — Track script execution times (optional)
+
+### v0.6 examples
+
+```toml
+# Scripts.toml — workspace + hooks + parameters + cargo-script
+[global_env]
+RUST_BACKTRACE = "1"
+
+[scripts]
+ci         = { include = ["fmt-check", "lint", "test-parallel"], info = "Full CI" }
+fmt-check  = "cargo fmt --all -- --check"
+lint       = "cargo clippy --workspace --all-targets -- -D warnings"
+
+# Run cargo test in every workspace member, in parallel.
+test-parallel = { command = "cargo test", workspace = "parallel" }
+
+# Parameterised deploy with hooks.
+[scripts.deploy]
+command    = "kubectl apply -f manifests/{{env}}.yaml"
+args       = ["env"]
+defaults   = { env = "staging" }
+pre        = ["fmt-check", "lint"]
+on_failure = ["rollback"]
+
+# A cargo-script (RFC 3502) Rust file
+[scripts.audit]
+script_file = "./scripts/audit.rs"
+info        = "Run a Rust audit script"
+```
+
+```bash
+cargo script ci                              # full pipeline
+cargo script ci --json                       # machine-readable
+cargo script test --watch                    # re-run on file changes
+cargo script deploy production               # parameter substitution
+cargo script test --parallel build --parallel doc   # multi-script parallel
+cargo script init --template github-actions  # scaffold CI
+cargo script workspace list                  # show discovered members
+```
 
 ## 📖 Usage Guide
 
@@ -310,11 +383,11 @@ cargo script
 Output:
 
 ```
-Script   Description                           
+Script   Description
 -------- --------------------------------------
-build    Build the project                     
-test     Run tests                             
-release  Build release version                
+build    Build the project
+test     Run tests
+release  Build release version
 ```
 
 With filter:
@@ -324,10 +397,10 @@ $ cargo script show --filter test
 
 Found 2 script(s) matching 'test':
 
-Script   Description                           
+Script   Description
 -------- --------------------------------------
-test     Run tests                             
-test-all Run all test suites                   
+test     Run tests
+test-all Run all test suites
 ```
 
 ### Dry-Run Mode
@@ -356,6 +429,7 @@ cargo script run --interactive
 ```
 
 This opens an interactive fuzzy finder where you can:
+
 - Type to search scripts
 - See script descriptions
 - Select and run scripts easily
@@ -448,10 +522,10 @@ cgs validate
 
 **What it checks:**
 
--   ✅ TOML syntax validity
--   ✅ Script references in `include` arrays
--   ✅ Tool requirements (checks if tools are installed)
--   ✅ Toolchain requirements (checks if Rust/Python toolchains are installed)
+- ✅ TOML syntax validity
+- ✅ Script references in `include` arrays
+- ✅ Tool requirements (checks if tools are installed)
+- ✅ Toolchain requirements (checks if Rust/Python toolchains are installed)
 
 **Example output:**
 
@@ -646,6 +720,15 @@ cargo script build --verbose
 cargo script build
 ```
 
+## 📚 Documentation
+
+- [Workspace Guide](docs/WORKSPACE_GUIDE.md) — multi-crate orchestration
+- [Cargo-Script Integration](docs/CARGO_SCRIPT_INTEGRATION.md) — `.rs` script files (RFC 3502)
+- [CI/CD Guide](docs/CI_CD_GUIDE.md) — templates + JSON output
+- [Advanced Features](docs/ADVANCED_FEATURES.md) — hooks, parallel, watch, parameters
+- [Migration Guides](docs/MIGRATION_GUIDES.md) — moving from `just` / `make` / `cargo-make` / `npm scripts`
+- [Examples](examples/) — runnable demo projects
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -656,9 +739,11 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 🙏 Acknowledgments
 
--   Inspired by `npm scripts`, `make`, and `just`
--   Built with [clap](https://github.com/clap-rs/clap) for excellent CLI experience
--   Uses [colored](https://github.com/mackwic/colored) for beautiful terminal output
+- Inspired by `npm scripts`, `make`, `just`, and `cargo-make`
+- Designed to complement [Rust RFC 3502 (`cargo-script`)](https://rust-lang.github.io/rfcs/3502-cargo-script.html) — single-file Rust scripts
+- Built with [clap](https://github.com/clap-rs/clap) for excellent CLI experience
+- Uses [colored](https://github.com/mackwic/colored) for beautiful terminal output
+- Parallel execution powered by [tokio](https://tokio.rs); watch mode by [notify](https://github.com/notify-rs/notify)
 
 ---
 

@@ -46,6 +46,39 @@ pub enum CargoScriptError {
         script: String,
         command: String,
     },
+    /// Workspace `Cargo.toml` could not be found at or above the given path
+    WorkspaceNotFound {
+        path: String,
+    },
+    /// One or more scripts failed during a parallel execution
+    ParallelExecutionFailed {
+        failed_scripts: Vec<String>,
+    },
+    /// Requested template does not exist in the registry
+    TemplateNotFound {
+        name: String,
+        available: Vec<String>,
+    },
+    /// `cargo script` (single-file packages) is not available on the current toolchain
+    CargoScriptNotAvailable {
+        suggestion: String,
+    },
+    /// A pre/post/on_success/on_failure hook failed
+    HookFailed {
+        hook_name: String,
+        script_name: String,
+        reason: String,
+    },
+    /// Watch mode error (file system event subscription failed)
+    WatchError {
+        path: String,
+        message: String,
+    },
+    /// A required script argument/parameter was not provided
+    MissingScriptArgument {
+        script_name: String,
+        argument: String,
+    },
 }
 
 impl fmt::Display for CargoScriptError {
@@ -216,6 +249,102 @@ impl fmt::Display for CargoScriptError {
                     "but Windows prevents this because cargo-script.exe is currently in use.".white(),
                     "Solution:".yellow().bold(),
                     format!("Run '{}' directly in your terminal (not via cargo script)", command.green()).white()
+                )
+            }
+            CargoScriptError::WorkspaceNotFound { path } => {
+                write!(
+                    f,
+                    "{}\n\n{}\n  {}\n\n{}\n  {}\n  {}",
+                    "❌ Workspace not found".red().bold(),
+                    "Error:".yellow().bold(),
+                    format!("No Cargo.toml with a [workspace] section was found at or above '{}'", path).white(),
+                    "Quick fix:".yellow().bold(),
+                    "Run cargo-run from inside a Cargo workspace, or".white(),
+                    "explicitly declare members in [workspace] of your Scripts.toml.".white(),
+                )
+            }
+            CargoScriptError::ParallelExecutionFailed { failed_scripts } => {
+                let list = failed_scripts
+                    .iter()
+                    .map(|s| format!("    - {}", s.red()))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                write!(
+                    f,
+                    "{}\n\n{}\n  {} script(s) failed in parallel execution:\n{}",
+                    "❌ Parallel execution failed".red().bold(),
+                    "Error:".yellow().bold(),
+                    failed_scripts.len(),
+                    list,
+                )
+            }
+            CargoScriptError::TemplateNotFound { name, available } => {
+                let list = if available.is_empty() {
+                    "  (no templates registered)".to_string()
+                } else {
+                    available
+                        .iter()
+                        .map(|t| format!("  • {}", t.green()))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                write!(
+                    f,
+                    "{}\n\n{}\n  Template '{}' is not registered\n\n{}\n{}\n\n{}\n  {}",
+                    "❌ Template not found".red().bold(),
+                    "Error:".yellow().bold(),
+                    name.bold(),
+                    "Available templates:".yellow().bold(),
+                    list,
+                    "Quick fix:".yellow().bold(),
+                    format!("Run '{}' to list templates", "cargo script init --list-templates".green()).white(),
+                )
+            }
+            CargoScriptError::CargoScriptNotAvailable { suggestion } => {
+                write!(
+                    f,
+                    "{}\n\n{}\n  cargo-script (single-file Rust packages) is not available\n\n{}\n{}",
+                    "❌ cargo script not available".red().bold(),
+                    "Error:".yellow().bold(),
+                    "Suggestion:".yellow().bold(),
+                    suggestion,
+                )
+            }
+            CargoScriptError::HookFailed { hook_name, script_name, reason } => {
+                write!(
+                    f,
+                    "{}\n\n{}\n  Hook '{}' for script '{}' failed\n  Reason: {}\n\n{}\n  {}",
+                    "❌ Hook execution failed".red().bold(),
+                    "Error:".yellow().bold(),
+                    hook_name.bold(),
+                    script_name.bold(),
+                    reason,
+                    "Suggestion:".yellow().bold(),
+                    "Check that the hook script exists in Scripts.toml and exits successfully".white(),
+                )
+            }
+            CargoScriptError::WatchError { path, message } => {
+                write!(
+                    f,
+                    "{}\n\n{}\n  Failed to watch '{}'\n  {}\n\n{}\n  {}",
+                    "❌ Watch mode error".red().bold(),
+                    "Error:".yellow().bold(),
+                    path,
+                    message,
+                    "Suggestion:".yellow().bold(),
+                    "Ensure the path exists and the process has read access".white(),
+                )
+            }
+            CargoScriptError::MissingScriptArgument { script_name, argument } => {
+                write!(
+                    f,
+                    "{}\n\n{}\n  Script '{}' requires argument '{}'\n\n{}\n  {}",
+                    "❌ Missing script argument".red().bold(),
+                    "Error:".yellow().bold(),
+                    script_name.bold(),
+                    argument.bold(),
+                    "Quick fix:".yellow().bold(),
+                    format!("Pass it as: cargo script {} {}=<value>", script_name, argument).green().to_string(),
                 )
             }
         }

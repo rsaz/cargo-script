@@ -1,0 +1,33 @@
+[global_env]
+RUST_BACKTRACE = "1"
+
+[scripts]
+# ---------- Hooks ----------
+# Pre/post/on_success/on_failure form a tiny pipeline around the main command.
+[scripts.deploy]
+command    = "echo Deploying {{env}}..."
+args       = ["env"]
+defaults   = { env = "staging" }
+pre        = ["fmt-check", "lint"]
+on_success = ["notify-success"]
+on_failure = ["rollback", "notify-failure"]
+
+[scripts.fmt-check]
+command = "cargo fmt --all -- --check"
+
+[scripts.lint]
+command = "cargo clippy --all-targets -- -D warnings"
+
+[scripts.notify-success]
+command = "echo 'Deploy OK'"
+
+[scripts.notify-failure]
+command = "echo 'Deploy FAILED'"
+
+[scripts.rollback]
+command = "echo 'Rolling back...'"
+
+# ---------- Watch ----------
+[scripts.test-watch]
+command = "cargo test"
+info    = "Run 'cargo script test-watch --watch' to re-run on changes"

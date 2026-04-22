@@ -1,0 +1,11 @@
+[scripts]
+# Implicit (path heuristic): any command pointing at an existing .rs file
+# is executed via cargo-script (RFC 3502).
+greet = "./scripts/greet.rs"
+
+# Explicit form (allows env, info, args, defaults, hooks, ...).
+[scripts.report]
+script_file = "./scripts/report.rs"
+info        = "Generate a tiny project report"
+args        = ["title"]
+defaults    = { title = "report" }
