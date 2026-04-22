@@ -70,14 +70,16 @@ test = "cargo test"
     cleanup_scripts_toml(&test_file);
 }
 
-/// Tests that invalid TOML shows error message
+/// Tests that invalid TOML shows error message.
+///
+/// We use unambiguously malformed TOML (an unterminated string literal +
+/// missing closing bracket on the table header) so the test does not
+/// depend on parser-specific tolerances such as trailing commas in inline
+/// tables, which different versions of the `toml` crate accept silently.
 #[test]
 fn test_invalid_toml_error() {
     let test_file = setup_scripts_toml(
-        r#"
-[scripts]
-invalid = { command = "test", }
-"#,
+        "[scripts\ninvalid = \"unterminated string\nbroken = oops\n",
         "invalid_toml",
     );
 
@@ -87,7 +89,7 @@ invalid = { command = "test", }
         .failure()
         .stderr(contains("Invalid TOML"))
         .stderr(contains("Quick fix"));
-    
+
     cleanup_scripts_toml(&test_file);
 }
 
